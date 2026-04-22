@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 import unicodedata
 import urllib.parse
@@ -42,7 +43,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
 
 # .env faylini yuklash
-load_dotenv()
+env_path = Path(__file__).parent / "config" / ".env"
+load_dotenv(env_path)
 
 # ═══════════════════════════════════════════════════════
 # 2. SOZLAMALAR
@@ -53,14 +55,22 @@ DEVELOPER      = "@MuhammadjonXP"
 ADMIN_USERNAME = "@MuhammadjonXP_Admin"
 CHANNEL_LINK   = "@navohubbot_hisobotlar"  # yoki -100xxxxxxxxxx
 
-DOWNLOAD_DIR = Path("downloads")
-USERS_FILE   = Path("users.json")
-STATS_FILE    = Path("stats.json")
-COOKIES_FILE = Path(__file__).parent / "cookies.txt"
+# Vaqtinchalik fayllar uchun (RAM'da, disk emas!)
+TEMP_DIR = Path(tempfile.gettempdir()) / "navohub_temp"
+TEMP_DIR.mkdir(exist_ok=True)
+
+# Data fayllar (yangi struktura)
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
+USERS_FILE   = DATA_DIR / "users.json"
+STATS_FILE    = DATA_DIR / "stats.json"
+COOKIES_FILE = BASE_DIR / "scripts" / "cookies.txt"
 
 SEARCH_LIMIT = 50
 PER_PAGE = 10
-LOG_FILE = Path("activity.log")
+LOG_FILE = DATA_DIR / "activity.log"  # Path("activity.log") -> DATA_DIR / "activity.log"
 MAX_DURATION = 1200    # 20 daqiqa
 MAX_FILE_MB  = 2000  # Telegram limit: 2GB (2000 MB)
 CACHE_TTL    = 86_400  # 24 soat
@@ -92,32 +102,40 @@ VIDEO_QUALITIES = [
 if hasattr(sys.stdout, "buffer"):
     sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-class LogHandler(logging.Handler):
+# Sodda logging (faqat console va fayl)
+class FlushStreamHandler(logging.StreamHandler):
     def emit(self, record):
-        try:
-            msg = self.format(record)
-            print(msg)
-            with open(LOG_FILE, "a", encoding="utf-8") as f:
-                f.write(msg + "\n")
-        except Exception:
-            pass
+        super().emit(record)
+        self.flush()
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    format="%(asctime)s  %(message)s",
     datefmt="%H:%M:%S",
-    handlers=[logging.StreamHandler(sys.stdout), LogHandler()],
+    handlers=[
+        FlushStreamHandler(sys.stdout),  # Flush bilan
+        logging.FileHandler(LOG_FILE, encoding="utf-8")
+    ],
+    force=True
 )
 log = logging.getLogger("NavoHub")
-logging.getLogger("aiogram").setLevel(logging.WARNING)
-logging.getLogger("aiohttp").setLevel(logging.WARNING)
-logging.getLogger("yt_dlp").setLevel(logging.WARNING)
+
+# Aiogram va boshqa kutubxonalarning xatolarini butunlay yashirish
+logging.getLogger("aiogram").setLevel(logging.CRITICAL)
+logging.getLogger("aiogram.event").setLevel(logging.CRITICAL)
+logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
+logging.getLogger("yt_dlp").setLevel(logging.CRITICAL)
+
+# Darhol test xabari
+print("\n" + "=" * 50, flush=True)
+print("  🎵 NavoHub Bot", flush=True)
+print("=" * 50, flush=True)
 
 # ═══════════════════════════════════════════════════════
 # 4. XOTIRA VA KESH
 # ═══════════════════════════════════════════════════════
-DOWNLOAD_DIR.mkdir(exist_ok=True)
-_pool = ThreadPoolExecutor(max_workers=8)
+# TEMP_DIR allaqachon yaratilgan (yuqorida)
+_pool = ThreadPoolExecutor(max_workers=16)  # 8 -> 16 (tezroq parallel yuklab olish)
 
 user_sessions: dict[int, dict] = {}
 _search_cache: dict[str, dict] = {}
@@ -258,6 +276,80 @@ def _views_to_int(text: str) -> int:
     return int(nums) if nums else 0
 
 # ═══════════════════════════════════════════════════════
+# 6.1. PROGRESS HELPER (Optimizatsiya)
+# ═══════════════════════════════════════════════════════
+async def update_progress_bar(
+    progress_msg: Message,
+    info: dict,
+    start_time: float,
+    download_complete_flag: list,
+    media_type: str = "🎵"
+) -> None:
+    """
+    Umumiy progress bar yangilash funksiyasi.
+    
+    Args:
+        progress_msg: Progress xabari
+        info: Media ma'lumotlari (title, uploader, duration)
+        start_time: Boshlangan vaqt
+        download_complete_flag: [False] - yuklanish tugaganda [True] ga o'zgaradi
+        media_type: "🎵" yoki "🎬"
+    """
+    progress = 0
+    while not download_complete_flag[0] and progress < 95:
+        await asyncio.sleep(0.5)  # 1s -> 0.5s (tezroq yangilanish)
+        progress = min(95, progress + 20)  # 15 -> 20 (tezroq o'sish)
+        elapsed = time.time() - start_time
+        try:
+            caption_text = (
+                f"📥 <b>Yuklanmoqda...</b>\n\n"
+                f"{media_type} <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                f"👤 {h(info.get('uploader', ''))}\n"
+                f"⏱ {info.get('duration', '?')}\n\n"
+                f"⏳ Jarayon: <code>{progress}%</code>\n"
+                f"⏱ Vaqt: <code>{int(elapsed)}s</code>"
+            )
+            
+            if hasattr(progress_msg, 'photo') and progress_msg.photo:
+                await progress_msg.edit_caption(caption_text, parse_mode="HTML")
+            else:
+                await progress_msg.edit_text(caption_text, parse_mode="HTML")
+        except Exception:
+            break
+
+async def show_completion(
+    progress_msg: Message,
+    info: dict,
+    elapsed: float,
+    media_type: str = "🎵"
+) -> None:
+    """
+    100% tugallangan xabarni ko'rsatish.
+    
+    Args:
+        progress_msg: Progress xabari
+        info: Media ma'lumotlari
+        elapsed: O'tgan vaqt
+        media_type: "🎵" yoki "🎬"
+    """
+    try:
+        caption_text = (
+            f"✅ <b>Tayyor!</b>\n\n"
+            f"{media_type} <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+            f"👤 {h(info.get('uploader', ''))}\n"
+            f"⏱ {info.get('duration', '?')}\n\n"
+            f"⏳ Jarayon: <code>100%</code>\n"
+            f"⏱ Vaqt: <code>{int(elapsed)}s</code>"
+        )
+        
+        if hasattr(progress_msg, 'photo') and progress_msg.photo:
+            await progress_msg.edit_caption(caption_text, parse_mode="HTML")
+        else:
+            await progress_msg.edit_text(caption_text, parse_mode="HTML")
+    except Exception:
+        pass
+
+# ═══════════════════════════════════════════════════════
 # 7. FFMPEG
 # ═══════════════════════════════════════════════════════
 _FFMPEG_DIR = Path(__file__).parent / "ffmpeg"
@@ -295,7 +387,6 @@ def _install_ffmpeg() -> Optional[str]:
         return None
 
 _FFMPEG = _find_ffmpeg() or _install_ffmpeg()
-log.info("[FFMPEG]  %s", _FFMPEG or "topilmadi")
 
 # ═══════════════════════════════════════════════════════
 # 8. YOUTUBE INNERTUBE QIDIRUV (ultra tez ~0.3s)
@@ -308,7 +399,7 @@ async def _search_innertube(query: str) -> list[dict]:
     payload = {"context": _IT_CTX, "query": query, "params": "EgIQAQ=="}
     try:
         sess    = _get_http()
-        timeout = aiohttp.ClientTimeout(total=3)  # 5s -> 3s (tezroq)
+        timeout = aiohttp.ClientTimeout(total=2)
         async with sess.post(
             _IT_URL, params={"key": _IT_KEY}, json=payload, timeout=timeout
         ) as resp:
@@ -336,10 +427,6 @@ async def _search_innertube(query: str) -> list[dict]:
                     vr.get("viewCountText", {}).get("simpleText", "")
                     or (vr.get("viewCountText", {}).get("runs") or [{}])[0].get("text", "")
                 )
-                # Cover rasmi (eng katta o'lcham)
-                thumbs   = vr.get("thumbnail", {}).get("thumbnails", [])
-                thumb    = thumbs[-1]["url"] if thumbs else ""
-                # maxres thumbnail
                 if vid_id:
                     thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
 
@@ -358,6 +445,9 @@ async def _search_innertube(query: str) -> list[dict]:
                 if len(tracks) >= SEARCH_LIMIT:
                     return tracks
         return tracks
+    except asyncio.TimeoutError:
+        log.warning("[QIDIRUV]  Timeout - InnerTube sekin, yt-dlp ishlatilmoqda")
+        return None
     except Exception as ex:
         log.warning("[QIDIRUV XATO]  %s", ex)
         return []
@@ -398,13 +488,8 @@ async def search_tracks(query: str) -> list[dict]:
         log.info("[KESH]  \"%s\"", query)
         return cached["tracks"]
     
-    # Parallel qidiruv: InnerTube va yt-dlp bir vaqtda
-    innertube_task = asyncio.create_task(_search_innertube(query))
+    tracks = await _search_innertube(query)
     
-    # InnerTube natijasini kutamiz (tez)
-    tracks = await innertube_task
-    
-    # Agar natija bo'lmasa, yt-dlp ishlatamiz
     if not tracks:
         log.info("[ZAXIRA]  yt-dlp ishlatilmoqda")
         tracks = await asyncio.get_event_loop().run_in_executor(_pool, _search_ytdlp_fallback, query)
@@ -425,16 +510,17 @@ def _ydl_base_opts() -> dict:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 15,
-        "retries":        5,
-        "fragment_retries": 5,
+        "socket_timeout": 10,  # 15 -> 10 (tezroq)
+        "retries":        3,   # 5 -> 3 (tezroq)
+        "fragment_retries": 3, # 5 -> 3 (tezroq)
         "no_check_certificate": True,
         "geo_bypass": True,
         "extractor_args": {
-            "youtube": {"player_client": ["web", "web_creator", "android"]},
+            "youtube": {"player_client": ["android", "web"]},  # android birinchi (tezroq)
             "default": {"nocheckcertificate": True}
         },
-        "http_chunk_size": 2_097_152,
+        "http_chunk_size": 10_485_760,  # 2MB -> 10MB (tezroq yuklab olish)
+        "concurrent_fragment_downloads": 16,  # 8 -> 16 (parallel yuklab olish)
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
@@ -447,8 +533,8 @@ def _url_info_sync(url: str) -> Optional[dict]:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 10,
-        "retries":        3,
+        "socket_timeout": 8,  # 10 -> 8 (tezroq)
+        "retries":        2,  # 3 -> 2 (tezroq)
         "skip_download": True, 
         "extract_flat": False,
         "no_check_certificate": True,
@@ -503,14 +589,13 @@ def _download_audio_sync(url: str) -> Optional[dict]:
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
-        "concurrent_fragment_downloads": 8,
-        "outtmpl": str(DOWNLOAD_DIR / f"{fname}.%(ext)s"),
+        "outtmpl": str(TEMP_DIR / f"{fname}.%(ext)s"),
     }
     if _FFMPEG:
         opts["ffmpeg_location"] = str(Path(_FFMPEG).parent)
-        opts["format"]          = "bestaudio[abr<=160]/bestaudio/best"
+        opts["format"]          = "bestaudio[abr<=128]/bestaudio/best"  # 160 -> 128 (tezroq, kichikroq)
         opts["postprocessors"]  = [{"key": "FFmpegExtractAudio",
-                                    "preferredcodec": "mp3", "preferredquality": "160"}]
+                                    "preferredcodec": "mp3", "preferredquality": "128"}]  # 160 -> 128
     else:
         opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
     try:
@@ -523,7 +608,7 @@ def _download_audio_sync(url: str) -> Optional[dict]:
         return {"error": "failed"}
 
     for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
-        fp = DOWNLOAD_DIR / f"{fname}.{ext}"
+        fp = TEMP_DIR / f"{fname}.{ext}"
         if fp.exists():
             size = fp.stat().st_size / 1_048_576
             if size > MAX_FILE_MB:
@@ -544,12 +629,11 @@ def _download_video_sync(url: str, quality: int) -> Optional[dict]:
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
-        "concurrent_fragment_downloads": 8,
-        "outtmpl": str(DOWNLOAD_DIR / f"{fname}.%(ext)s"),
+        "outtmpl": str(TEMP_DIR / f"{fname}.%(ext)s"),
         "merge_output_format": "mp4",
     }
     if quality == 0:
-        opts["format"] = "bestvideo+bestaudio/best"
+        opts["format"] = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"  # Max 1080p (tezroq)
     else:
         opts["format"] = (
             f"bestvideo[height<={quality}]+bestaudio/"
@@ -567,7 +651,7 @@ def _download_video_sync(url: str, quality: int) -> Optional[dict]:
         return {"error": "failed"}
 
     for ext in ("mp4", "mkv", "webm", "mov"):
-        fp = DOWNLOAD_DIR / f"{fname}.{ext}"
+        fp = TEMP_DIR / f"{fname}.{ext}"
         if fp.exists():
             size = fp.stat().st_size / 1_048_576
             if size > MAX_FILE_MB:
@@ -740,20 +824,10 @@ async def on_start(msg: Message) -> None:
     try:
         u     = msg.from_user
         name  = (u.first_name or "Do'stim") if u else "Do'stim"
-        lname = (u.last_name  or "")        if u else ""
-        uname = f"@{u.username}"            if (u and u.username) else "username yo'q"
-        uid   = u.id                        if u else 0
-        lang  = (u.language_code.upper() if u and u.language_code else "?")
+        uid   = u.id if u else 0
 
         _track_user(uid, name)
-
-        log.info("-" * 45)
-        log.info("  [/START]")
-        log.info("  Ismi       : %s %s", name, lname)
-        log.info("  Username   : %s", uname)
-        log.info("  Telegram ID: %s", uid)
-        log.info("  Til        : %s", lang)
-        log.info("-" * 45)
+        log.info(f"👤 {name} - /start")
 
         await msg.answer(msg_welcome(name), parse_mode=PM, disable_web_page_preview=True)
         
@@ -767,7 +841,7 @@ async def on_start(msg: Message) -> None:
             parse_mode=PM
         )
     except Exception as ex:
-        log.error("[XATO]  /start: %s", ex)
+        log.error(f"❌ /start xato: {ex}")
 
 @router.message(Command("help"))
 async def on_help(msg: Message) -> None:
@@ -847,13 +921,13 @@ async def on_text(msg: Message) -> None:
         text = msg.text.strip()
 
         if m := URL_RE.search(text):
-            log.info("[HAVOLA]  %s  ->  %s", name, text[:70])
+            log.info(f"🔗 {name} - {text[:40]}...")
             await _handle_url(msg, m.group())
         else:
-            log.info("[QIDIRUV]  %s  ->  \"%s\"", name, text[:50])
+            log.info(f"🔍 {name} - \"{text[:30]}...\"")
             await _handle_search(msg, text)
     except Exception as ex:
-        log.error("[XATO]  on_text: %s", ex)
+        log.error(f"❌ Xato: {ex}")
 
 # ───────────────────────────────────────────────────────
 async def _handle_search(msg: Message, query: str) -> None:
@@ -871,6 +945,7 @@ async def _handle_search(msg: Message, query: str) -> None:
             "💡 Boshqacha nom yozib ko'ring.",
             parse_mode=PM,
         )
+        log.info(f"❌ Topilmadi")
         return
 
     uid = msg.from_user.id if msg.from_user else 0
@@ -882,7 +957,7 @@ async def _handle_search(msg: Message, query: str) -> None:
         parse_mode=PM,
         reply_markup=kb_tracks(len(tracks), page),
     )
-    log.info("[QIDIRUV VAQTI]  %.2f soniya", elapsed)
+    log.info(f"✅ {len(tracks)} ta natija ({elapsed:.1f}s)")
 
 async def _handle_url(msg: Message, url: str) -> None:
     status = await msg.answer("⏳ Havola tekshirilmoqda...", parse_mode=PM)
@@ -914,8 +989,13 @@ async def _handle_url(msg: Message, url: str) -> None:
     caption = msg_url_info(info)
     kb      = kb_video_formats(info.get("formats", []))
 
-    # Faqat text xabar (rasm yo'q)
-    await status.edit_text(caption, parse_mode=PM, reply_markup=kb)
+    # Status xabarni o'chirish va yangi xabar yuborish (format tugmalari bilan)
+    try:
+        await status.delete()
+    except Exception:
+        pass
+    
+    await msg.answer(caption, parse_mode=PM, reply_markup=kb)
 
 # ───────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("page:"))
@@ -956,6 +1036,9 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
     track = sess["tracks"][idx]
     await cb.answer(f"⬇️ {track['title'][:40]}")
     
+    name = cb.from_user.first_name if cb.from_user else "Foydalanuvchi"
+    log.info(f"📥 {name} - \"{track['title'][:30]}...\"")
+    
     # Yangi xabar yuborish (eski xabarni o'chirmaslik)
     start_time = time.time()
     progress_msg = await bot.send_message(
@@ -964,56 +1047,36 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
         f"🎵 <b>{h(track['title'])}</b>\n"
         f"👤 {h(track.get('uploader', ''))}\n"
         f"⏱ {track.get('duration', '?')}\n\n"
-        f"⏳ Jarayon: <code>0%</code>\n"
-        f"⏱ Vaqt: <code>0s</code>",
+        f"⏳ Jarayon: <code>0%</code>",
         parse_mode=PM,
     )
     
-    # Progress update task
-    download_complete = False
-    async def update_progress():
-        progress = 0
-        while not download_complete and progress < 95:
-            await asyncio.sleep(1)
-            progress = min(95, progress + 15)
-            elapsed = time.time() - start_time
-            try:
-                await progress_msg.edit_text(
-                    f"📥 <b>Yuklanmoqda...</b>\n\n"
-                    f"🎵 <b>{h(track['title'])}</b>\n"
-                    f"👤 {h(track.get('uploader', ''))}\n"
-                    f"⏱ {track.get('duration', '?')}\n\n"
-                    f"⏳ Jarayon: <code>{progress}%</code>\n"
-                    f"⏱ Vaqt: <code>{int(elapsed)}s</code>",
-                    parse_mode=PM
-                )
-            except Exception:
-                break
-    
-    # Start progress updates
-    progress_task = asyncio.create_task(update_progress())
+    # Progress update task (Optimizatsiya: umumiy funksiya)
+    download_complete = [False]
+    progress_task = asyncio.create_task(
+        update_progress_bar(progress_msg, track, start_time, download_complete, "🎵")
+    )
     
     result = await download_audio(track["url"])
-    download_complete = True
+    download_complete[0] = True
     progress_task.cancel()
     
     elapsed = time.time() - start_time
     
+    # 100% ko'rsatish (Optimizatsiya: umumiy funksiya)
+    await show_completion(progress_msg, track, elapsed, "🎵")
+    
+    # Progress xabarni o'chirish (tez yuborish uchun)
     try:
-        await progress_msg.edit_text(
-            f"✅ <b>Yuklab olindi!</b>\n\n"
-            f"🎵 <b>{h(track['title'])}</b>\n"
-            f"👤 {h(track.get('uploader', ''))}\n"
-            f"⏱ {track.get('duration', '?')}\n\n"
-            f"⏳ Jarayon: <code>100%</code>\n"
-            f"⏱ Vaqt: <code>{int(elapsed)}s</code>\n\n"
-            f"📤 Yuborilmoqda...",
-            parse_mode=PM
-        )
+        await progress_msg.delete()
     except Exception:
         pass
     
-    await _deliver_audio(bot, progress_msg, result, track, uid, "MP3")
+    # uid ni uzatish (statistika uchun)
+    await _deliver_audio(bot, cb.message.chat.id, result, track, uid)
+    
+    if result and not result.get("error"):
+        log.info(f"✅ Yuborildi ({elapsed:.1f}s)")
 
 @router.callback_query(F.data.startswith("vf:"))
 async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
@@ -1029,23 +1092,11 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
 
     await cb.answer("⬇️ Yuklanmoqda...")
 
-    loading = "⬇️ <b>Yuklanmoqda...</b>\n\n⏳ Biroz sabr qiling..."
-    try:
-        if cb.message.photo:
-            await cb.message.edit_caption(loading, parse_mode=PM)
-        else:
-            await cb.message.edit_text(loading, parse_mode=PM)
-    except Exception:
-        pass
-
     # Faqat rasm
     if fmt == "pic":
         thumb = info.get("thumbnail", "")
         if thumb:
-            try:
-                await cb.message.delete()
-            except Exception:
-                pass
+            # Yangi xabar yuborish (eski xabarni o'chirmaslik)
             await bot.send_photo(
                 cb.message.chat.id,
                 photo=thumb,
@@ -1058,7 +1109,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             await bot.send_message(cb.message.chat.id, "❌ Rasm topilmadi.", parse_mode=PM)
         return
 
-    # Progress xabari (rasm bilan)
+    # Progress xabari (rasm bilan) - YANGI XABAR yuborish
     start_time = time.time()
     thumb_url = info.get("thumbnail", "")
     
@@ -1106,8 +1157,8 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         async def update_progress():
             progress = 0
             while not download_complete and progress < 95:
-                await asyncio.sleep(1)
-                progress = min(95, progress + 15)
+                await asyncio.sleep(0.5)  # 1s -> 0.5s (tezroq)
+                progress = min(95, progress + 20)  # 15 -> 20 (tezroq)
                 elapsed = time.time() - start_time
                 try:
                     if progress_msg.photo:
@@ -1145,30 +1196,34 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         try:
             if progress_msg.photo:
                 await progress_msg.edit_caption(
-                    f"✅ <b>Yuklab olindi!</b>\n\n"
+                    f"✅ <b>Tayyor!</b>\n\n"
                     f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
-                    f"⏱ Vaqt: <code>{int(elapsed)}s</code>\n\n"
-                    f"📤 Yuborilmoqda...",
+                    f"⏱ Vaqt: <code>{int(elapsed)}s</code>",
                     parse_mode=PM
                 )
             else:
                 await progress_msg.edit_text(
-                    f"✅ <b>Yuklab olindi!</b>\n\n"
+                    f"✅ <b>Tayyor!</b>\n\n"
                     f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
-                    f"⏱ Vaqt: <code>{int(elapsed)}s</code>\n\n"
-                    f"📤 Yuborilmoqda...",
+                    f"⏱ Vaqt: <code>{int(elapsed)}s</code>",
                     parse_mode=PM
                 )
         except Exception:
             pass
         
-        await _deliver_audio(bot, progress_msg, result, info, uid, "MP3")
+        # Progress xabarni o'chirish
+        try:
+            await progress_msg.delete()
+        except Exception:
+            pass
+        
+        await _deliver_audio(bot, cb.message.chat.id, result, info, uid)
         return
 
     # Video
@@ -1185,8 +1240,8 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
     async def update_progress():
         progress = 0
         while not download_complete and progress < 95:
-            await asyncio.sleep(1)
-            progress = min(95, progress + 15)
+            await asyncio.sleep(0.5)  # 1s -> 0.5s (tezroq)
+            progress = min(95, progress + 20)  # 15 -> 20 (tezroq)
             elapsed = time.time() - start_time
             try:
                 if progress_msg.photo:
@@ -1240,14 +1295,19 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
-                f"⏱ Vaqt: <code>{int(elapsed)}s</code>\n\n"
-                f"📤 Yuborilmoqda...",
+                f"⏱ Vaqt: <code>{int(elapsed)}s</code>",
                 parse_mode=PM
             )
     except Exception:
         pass
     
-    await _deliver_video(bot, progress_msg, result, format_label, uid, format_type)
+    # Progress xabarni o'chirish
+    try:
+        await progress_msg.delete()
+    except Exception:
+        pass
+    
+    await _deliver_video(bot, cb.message.chat.id, result, quality_label, uid)
 
 @router.callback_query(F.data == "cancel")
 async def on_cancel(cb: CallbackQuery) -> None:
@@ -1270,13 +1330,9 @@ async def on_new_search(cb: CallbackQuery) -> None:
     )
 
 # ───────────────────────────────────────────────────────
-async def _deliver_audio(bot: Bot, status: Message, result: Optional[dict], meta: dict, uid: int = 0, format_type: str = "MP3") -> None:
-    chat_id = status.chat.id
-    try:
-        await status.delete()
-    except Exception:
-        pass
-
+async def _deliver_audio(bot: Bot, chat_id: int, result: Optional[dict], meta: dict, uid: int = 0, format_type: str = "MP3") -> None:
+    # Qidiruv natijalarini o'chirmaslik uchun faqat chat_id ishlatamiz
+    
     if result and uid:
         _record_download(uid, meta.get("title", ""), format_type)
 
@@ -1318,7 +1374,7 @@ async def _deliver_audio(bot: Bot, status: Message, result: Optional[dict], meta
         thumb_file = None
         if thumb_url and thumb_url.startswith("http"):
             try:
-                thumb_path = DOWNLOAD_DIR / f"thumb_{int(time.time()*1000)}.jpg"
+                thumb_path = TEMP_DIR / f"thumb_{int(time.time()*1000)}.jpg"
                 async with _get_http().get(thumb_url) as resp:
                     if resp.status == 200:
                         thumb_path.write_bytes(await resp.read())
@@ -1372,13 +1428,9 @@ async def _deliver_audio(bot: Bot, status: Message, result: Optional[dict], meta
         except Exception:
             pass
 
-async def _deliver_video(bot: Bot, status: Message, result: Optional[dict], quality_label: str, uid: int = 0, format_type: str = "Video") -> None:
-    chat_id = status.chat.id
-    try:
-        await status.delete()
-    except Exception:
-        pass
-
+async def _deliver_video(bot: Bot, chat_id: int, result: Optional[dict], quality_label: str, uid: int = 0, format_type: str = "Video") -> None:
+    # Qidiruv natijalarini o'chirmaslik uchun faqat chat_id ishlatamiz
+    
     if result and uid:
         _record_download(uid, "", format_type)
 
@@ -1464,13 +1516,21 @@ async def _cleanup_loop() -> None:
             del user_sessions[uid]
         if old:
             log.info("[TOZALASH]  %d sessiya o'chirildi", len(old))
-        removed = sum(
-            1 for fp in DOWNLOAD_DIR.iterdir()
-            if fp.is_file() and now - fp.stat().st_mtime > CACHE_TTL
-            and not fp.unlink()
-        )
-        if removed:
-            log.info("[TOZALASH]  %d fayl o'chirildi", removed)
+        
+        # Vaqtinchalik fayllarni tozalash (eski fayllar)
+        try:
+            removed = 0
+            for fp in TEMP_DIR.iterdir():
+                if fp.is_file() and now - fp.stat().st_mtime > CACHE_TTL:
+                    try:
+                        fp.unlink()
+                        removed += 1
+                    except Exception:
+                        pass
+            if removed:
+                log.info("[TOZALASH]  %d fayl o'chirildi", removed)
+        except Exception as ex:
+            log.warning("[TOZALASH XATO]  %s", ex)
 
 async def _send_daily_report(bot: Bot) -> None:
     try:
@@ -1540,31 +1600,33 @@ async def _report_scheduler(bot: Bot) -> None:
 # 14. MAIN
 # ═══════════════════════════════════════════════════════
 async def main() -> None:
+    log.info("⚙️  Bot sozlanmoqda...")
+    
     bot = Bot(token=BOT_TOKEN)
     dp  = Dispatcher()
     dp.include_router(router)
 
     try:
-        await bot.delete_webhook(drop_pending_updates=False)
-        log.info("[OK]  Webhook o'chirildi")
-    except Exception as ex:
-        log.warning("[WEBHOOK]  %s", ex)
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception:
+        pass
 
     me = await bot.get_me()
-    log.info("=" * 50)
-    log.info("  Bot       : @%s", me.username)
-    log.info("  ID        : %s", me.id)
-    log.info("  Cookie    : %s", "Ha" if COOKIES_FILE.exists() else "Yo'q")
-    log.info("  Holat     : ISHGA TUSHDI")
-    log.info("=" * 50)
+    log.info(f"✅ Bot tayyor: @{me.username}")
+    log.info("👂 Xabarlar kutilmoqda...\n")
 
     asyncio.create_task(_cleanup_loop())
     asyncio.create_task(_report_scheduler(bot))
     try:
-        await dp.start_polling(bot, drop_pending_updates=False)
+        await dp.start_polling(bot, drop_pending_updates=True)
     finally:
         if _http_session and not _http_session.closed:
             await _http_session.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⛔ Bot to'xtatildi\n", flush=True)
+    except Exception as e:
+        print(f"\n❌ Xato: {e}\n", flush=True)
