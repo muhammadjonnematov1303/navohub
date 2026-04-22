@@ -425,13 +425,16 @@ def _ydl_base_opts() -> dict:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 30,
-        "retries":        10,
-        "fragment_retries": 10,
+        "socket_timeout": 15,
+        "retries":        5,
+        "fragment_retries": 5,
         "no_check_certificate": True,
         "geo_bypass": True,
-        # android_music: bot blokini chetlab o'tadi
-        "extractor_args": {"youtube": {"player_client": ["android_music", "android", "web"]}},
+        "extractor_args": {
+            "youtube": {"player_client": ["web", "web_creator", "android"]},
+            "default": {"nocheckcertificate": True}
+        },
+        "http_chunk_size": 2_097_152,
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
@@ -440,7 +443,12 @@ def _ydl_base_opts() -> dict:
 
 def _url_info_sync(url: str) -> Optional[dict]:
     opts = {
-        **_ydl_base_opts(), 
+        "quiet":          True,
+        "no_warnings":    True,
+        "ignoreerrors":   False,
+        "noplaylist":     True,
+        "socket_timeout": 10,
+        "retries":        3,
         "skip_download": True, 
         "extract_flat": False,
         "no_check_certificate": True,
@@ -495,7 +503,7 @@ def _download_audio_sync(url: str) -> Optional[dict]:
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
-        "concurrent_fragment_downloads": 4,
+        "concurrent_fragment_downloads": 8,
         "outtmpl": str(DOWNLOAD_DIR / f"{fname}.%(ext)s"),
     }
     if _FFMPEG:
@@ -536,7 +544,7 @@ def _download_video_sync(url: str, quality: int) -> Optional[dict]:
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
-        "concurrent_fragment_downloads": 4,
+        "concurrent_fragment_downloads": 8,
         "outtmpl": str(DOWNLOAD_DIR / f"{fname}.%(ext)s"),
         "merge_output_format": "mp4",
     }
