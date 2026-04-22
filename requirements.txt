@@ -1,4 +1,4 @@
-aiogram==2.27.2
+aiogram==2.25.2
 yt-dlp==2024.12.23
 aiohttp==3.9.5
 aiofiles==23.2.1
