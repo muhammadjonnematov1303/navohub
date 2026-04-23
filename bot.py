@@ -3,6 +3,7 @@
 ╔══════════════════════════════════════════════════════╗
 ║            NavoHub — Telegram Musiqa Bot             ║
 ║        YouTube qidiruv | MP3 | Video formatlar       ║
+║                    v2.1 - Optimized                  ║
 ╚══════════════════════════════════════════════════════╝
 """
 
@@ -119,17 +120,19 @@ logging.basicConfig(
     force=True
 )
 log = logging.getLogger("NavoHub")
+log.setLevel(logging.INFO)
 
 # Aiogram va boshqa kutubxonalarning xatolarini butunlay yashirish
 logging.getLogger("aiogram").setLevel(logging.CRITICAL)
 logging.getLogger("aiogram.event").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
-logging.getLogger("yt_dlp").setLevel(logging.CRITICAL)
+logging.getLogger("yt_dlp").setLevel(logging.WARNING)  # CRITICAL -> WARNING (xatolarni ko'rish uchun)
 
 # Darhol test xabari
 print("\n" + "=" * 50, flush=True)
-print("  🎵 NavoHub Bot", flush=True)
+print("  🎵 NavoHub Bot v2.2", flush=True)
 print("=" * 50, flush=True)
+log.info("🚀 Bot yuklanmoqda...")
 
 # ═══════════════════════════════════════════════════════
 # 4. XOTIRA VA KESH
@@ -301,11 +304,14 @@ async def update_progress_bar(
         progress = min(95, progress + 20)  # 15 -> 20 (tezroq o'sish)
         elapsed = time.time() - start_time
         try:
+            title = info.get('title', 'Nomalum')
+            uploader = info.get('uploader', '')
+            duration = info.get('duration', '?')
             caption_text = (
                 f"📥 <b>Yuklanmoqda...</b>\n\n"
-                f"{media_type} <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
-                f"👤 {h(info.get('uploader', ''))}\n"
-                f"⏱ {info.get('duration', '?')}\n\n"
+                f"{media_type} <b>{h(title)}</b>\n"
+                f"👤 {h(uploader)}\n"
+                f"⏱ {duration}\n\n"
                 f"⏳ Jarayon: <code>{progress}%</code>\n"
                 f"⏱ Vaqt: <code>{int(elapsed)}s</code>"
             )
@@ -333,11 +339,14 @@ async def show_completion(
         media_type: "🎵" yoki "🎬"
     """
     try:
+        title = info.get('title', 'Nomalum')
+        uploader = info.get('uploader', '')
+        duration = info.get('duration', '?')
         caption_text = (
             f"✅ <b>Tayyor!</b>\n\n"
-            f"{media_type} <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
-            f"👤 {h(info.get('uploader', ''))}\n"
-            f"⏱ {info.get('duration', '?')}\n\n"
+            f"{media_type} <b>{h(title)}</b>\n"
+            f"👤 {h(uploader)}\n"
+            f"⏱ {duration}\n\n"
             f"⏳ Jarayon: <code>100%</code>\n"
             f"⏱ Vaqt: <code>{int(elapsed)}s</code>"
         )
@@ -360,15 +369,31 @@ _FFMPEG_URL = (
 )
 
 def _find_ffmpeg() -> Optional[str]:
+    # Avval system FFmpeg ni tekshirish
     if p := shutil.which("ffmpeg"):
         return p
+    # Windows uchun local FFmpeg
     return str(_FFMPEG_BIN) if _FFMPEG_BIN.exists() else None
 
 def _install_ffmpeg() -> Optional[str]:
+    """FFmpeg'ni yuklab olish va o'rnatish (progress bilan)"""
     log.info("[FFMPEG]  Yuklanmoqda...")
     zip_path = Path(__file__).parent / "ffmpeg_tmp.zip"
+    
     try:
-        urllib.request.urlretrieve(_FFMPEG_URL, zip_path)
+        # Progress callback
+        def show_progress(block_num, block_size, total_size):
+            downloaded = block_num * block_size
+            if total_size > 0:
+                percent = min(100, (downloaded * 100) // total_size)
+                if percent % 10 == 0:  # Har 10% da ko'rsatish
+                    print(f"\r[FFMPEG]  Yuklanmoqda... {percent}%", end="", flush=True)
+        
+        print("[FFMPEG]  Yuklanmoqda... 0%", end="", flush=True)
+        urllib.request.urlretrieve(_FFMPEG_URL, zip_path, reporthook=show_progress)
+        print("\r[FFMPEG]  Yuklanmoqda... 100%")
+        
+        log.info("[FFMPEG]  Arxiv ochilmoqda...")
         with zipfile.ZipFile(zip_path, "r") as zf:
             for m in zf.namelist():
                 if "/bin/ffmpeg.exe" in m or "/bin/ffprobe.exe" in m:
@@ -377,16 +402,27 @@ def _install_ffmpeg() -> Optional[str]:
                     fname = Path(m).name
                     with zf.open(m) as src, open(bin_dir / fname, "wb") as dst:
                         shutil.copyfileobj(src, dst)
+        
         zip_path.unlink()
-        log.info("[FFMPEG]  O'rnatildi: %s", _FFMPEG_BIN)
+        log.info("[FFMPEG]  ✅ O'rnatildi: %s", _FFMPEG_BIN)
         return str(_FFMPEG_BIN)
+        
     except Exception as ex:
-        log.warning("[FFMPEG]  O'rnatishda xato: %s", ex)
+        print(f"\n[FFMPEG]  ❌ Xato: {ex}")
+        log.error("[FFMPEG]  O'rnatishda xato: %s", ex, exc_info=True)
         if zip_path.exists():
-            zip_path.unlink()
+            try:
+                zip_path.unlink()
+            except:
+                pass
         return None
 
-_FFMPEG = _find_ffmpeg() or _install_ffmpeg()
+_FFMPEG = _find_ffmpeg()
+if _FFMPEG:
+    log.info(f"[FFMPEG]  ✅ Topildi: {_FFMPEG}")
+else:
+    log.warning("[FFMPEG]  ⚠️  Topilmadi - birinchi video yuklanishida o'rnatiladi")
+    log.warning("[FFMPEG]  💡 Yoki qo'lda o'rnating: winget install ffmpeg")
 
 # ═══════════════════════════════════════════════════════
 # 8. YOUTUBE INNERTUBE QIDIRUV (ultra tez ~0.3s)
@@ -419,7 +455,7 @@ async def _search_innertube(query: str) -> list[dict]:
                 vid_id = vr.get("videoId")
                 if not vid_id:
                     continue
-                title    = vr.get("title",     {}).get("runs", [{}])[0].get("text", "Noma'lum")
+                title    = vr.get("title",     {}).get("runs", [{}])[0].get("text", 'Nomalum')
                 uploader = vr.get("ownerText", {}).get("runs", [{}])[0].get("text", "")
                 dur_text = vr.get("lengthText", {}).get("simpleText", "")
                 dur_secs = _dur_to_sec(dur_text)
@@ -470,7 +506,7 @@ def _search_ytdlp_fallback(query: str) -> list[dict]:
             vid_id = e["id"]
             out.append({
                 "id":        vid_id,
-                "title":     e.get("title") or "Noma'lum",
+                "title":     e.get("title") or 'Nomalum',
                 "uploader":  e.get("uploader") or e.get("channel") or "",
                 "duration":  fmt_dur(dur),
                 "dur_secs":  dur,
@@ -505,26 +541,32 @@ async def search_tracks(query: str) -> list[dict]:
 # 9. YT-DLP YUKLAB OLISH
 # ═══════════════════════════════════════════════════════
 def _ydl_base_opts() -> dict:
+    """yt-dlp uchun optimal sozlamalar - YouTube bot detection bypass"""
     opts = {
-        "quiet":          True,
-        "no_warnings":    True,
-        "ignoreerrors":   False,
-        "noplaylist":     True,
-        "socket_timeout": 10,  # 15 -> 10 (tezroq)
-        "retries":        3,   # 5 -> 3 (tezroq)
-        "fragment_retries": 3, # 5 -> 3 (tezroq)
+        "quiet": False,  # True -> False (xatolarni ko'rish uchun)
+        "no_warnings": False,  # True -> False
+        "ignoreerrors": False,
+        "noplaylist": True,
+        "socket_timeout": 20,  # 30 -> 20 (tezroq)
+        "retries": 5,  # 10 -> 5 (tezroq)
+        "fragment_retries": 5,  # 10 -> 5
         "no_check_certificate": True,
         "geo_bypass": True,
+        # YouTube bot detection bypass - tv_embedded eng yaxshi
         "extractor_args": {
-            "youtube": {"player_client": ["android", "web"]},  # android birinchi (tezroq)
-            "default": {"nocheckcertificate": True}
+            "youtube": {
+                "player_client": ["tv_embedded"],  # TV client - bot detection yo'q
+                "skip": ["hls", "dash"],
+            },
         },
-        "http_chunk_size": 10_485_760,  # 2MB -> 10MB (tezroq yuklab olish)
-        "concurrent_fragment_downloads": 16,  # 8 -> 16 (parallel yuklab olish)
+        "http_chunk_size": 10_485_760,  # 10MB chunks
+        "concurrent_fragment_downloads": 8,  # 4 -> 8 (2x tezroq)
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
-        log.info("[COOKIE]  cookies.txt ishlatilmoqda")
+        log.info("[COOKIE]  ✅ cookies.txt ishlatilmoqda")
+    else:
+        log.warning("[COOKIE]  ⚠️  cookies.txt topilmadi - YouTube bloklashi mumkin!")
     return opts
 
 def _url_info_sync(url: str) -> Optional[dict]:
@@ -549,7 +591,7 @@ def _url_info_sync(url: str) -> Optional[dict]:
             return None
         
         vid_id = info.get("id", "")
-        title = info.get("title") or "Noma'lum"
+        title = info.get("title") or 'Nomalum'
         log.info("[URL INFO]  Topildi: %s", title[:50])
         
         # Thumbnail olish (turli manbalar)
@@ -586,46 +628,115 @@ async def get_url_info(url: str) -> Optional[dict]:
     return await asyncio.get_event_loop().run_in_executor(_pool, _url_info_sync, url)
 
 def _download_audio_sync(url: str) -> Optional[dict]:
+    """
+    Audio yuklab olish va MP3 ga konvertatsiya qilish
+    
+    Returns:
+        dict: {"file_path": str, "title": str, ...} yoki {"error": str}
+        None: Fayl topilmadi
+    """
     fname = f"navo_{int(time.time()*1000)}"
-    opts  = {
+    output_template = str(TEMP_DIR / f"{fname}.%(ext)s")
+    
+    # yt-dlp sozlamalari
+    opts = {
         **_ydl_base_opts(),
-        "outtmpl": str(TEMP_DIR / f"{fname}.%(ext)s"),
+        "outtmpl": output_template,
+        "format": "bestaudio/best",  # Eng yaxshi audio
     }
+    
+    # FFmpeg bilan MP3 konvertatsiya
     if _FFMPEG:
         opts["ffmpeg_location"] = str(Path(_FFMPEG).parent)
-        opts["format"]          = "bestaudio[abr<=128]/bestaudio/best"  # 160 -> 128 (tezroq, kichikroq)
-        opts["postprocessors"]  = [{"key": "FFmpegExtractAudio",
-                                    "preferredcodec": "mp3", "preferredquality": "128"}]  # 160 -> 128
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "128",
+        }]
+        log.info(f"[FFMPEG] Ishlatilmoqda: {_FFMPEG}")
     else:
-        opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
+        log.warning("[FFMPEG] Topilmadi - audio formatda yuklanadi")
+    
+    # Yuklab olish
     try:
+        log.info(f"[DOWNLOAD START] URL: {url[:70]}")
+        
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
+        
         if not info:
-            return None
+            log.error("[DOWNLOAD] info=None - video topilmadi")
+            return {"error": "not_found"}
+        
+        title = info.get('title', 'Nomalum')
+        log.info(f"[DOWNLOAD SUCCESS] {title[:50]}")
+        
+    except yt_dlp.utils.DownloadError as ex:
+        error_msg = str(ex)
+        log.error(f"[DOWNLOAD ERROR] {error_msg}", exc_info=True)
+        
+        # YouTube bot detection
+        if "Sign in" in error_msg or "bot" in error_msg.lower():
+            log.error("[YOUTUBE BOT DETECTION] Cookies kerak!")
+            return {"error": "bot_detected"}
+        
+        return {"error": "download_failed"}
+        
     except Exception as ex:
-        log.error("[MP3 XATO]  %s", ex)
+        log.error(f"[UNEXPECTED ERROR] {str(ex)}", exc_info=True)
         return {"error": "failed"}
-
-    for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
+    
+    # Yuklab olingan faylni topish
+    possible_extensions = ["mp3", "m4a", "webm", "opus", "ogg", "mp4"]
+    found_file = None
+    
+    for ext in possible_extensions:
         fp = TEMP_DIR / f"{fname}.{ext}"
         if fp.exists():
-            size = fp.stat().st_size / 1_048_576
-            if size > MAX_FILE_MB:
-                fp.unlink()
-                return {"error": "too_large", "size": round(size, 1)}
-            return {
-                "file_path": str(fp),
-                "title":     info.get("title") or "Noma'lum",
-                "uploader":  info.get("uploader") or info.get("channel") or "",
-                "duration":  fmt_dur(info.get("duration")),
-                "dur_secs":  info.get("duration") or 0,
-                "size_mb":   round(size, 1),
-                "thumbnail": f"https://i.ytimg.com/vi/{info.get('id','')}/hqdefault.jpg",
-            }
-    return None
+            found_file = fp
+            log.info(f"[FILE FOUND] {fp.name} ({fp.stat().st_size / 1_048_576:.1f} MB)")
+            break
+    
+    if not found_file:
+        log.error(f"[FILE NOT FOUND] Qidirildi: {fname}.{{mp3,m4a,webm,...}}")
+        log.error(f"[TEMP DIR] {TEMP_DIR}")
+        # Temp papkadagi fayllarni ko'rsatish
+        try:
+            files = list(TEMP_DIR.glob(f"{fname}*"))
+            log.error(f"[TEMP FILES] {[f.name for f in files]}")
+        except Exception:
+            pass
+        return {"error": "file_not_found"}
+    
+    # Fayl hajmini tekshirish
+    size_mb = found_file.stat().st_size / 1_048_576
+    if size_mb > MAX_FILE_MB:
+        log.warning(f"[FILE TOO LARGE] {size_mb:.1f} MB > {MAX_FILE_MB} MB")
+        found_file.unlink()
+        return {"error": "too_large", "size": round(size_mb, 1)}
+    
+    # Muvaffaqiyatli natija
+    return {
+        "file_path": str(found_file),
+        "title": info.get("title", "Nomalum"),
+        "uploader": info.get("uploader") or info.get("channel") or "",
+        "duration": fmt_dur(info.get("duration")),
+        "dur_secs": info.get("duration") or 0,
+        "size_mb": round(size_mb, 1),
+        "thumbnail": f"https://i.ytimg.com/vi/{info.get('id','')}/hqdefault.jpg",
+    }
 
 def _download_video_sync(url: str, quality: int) -> Optional[dict]:
+    """Video yuklab olish (FFmpeg lazy loading bilan)"""
+    global _FFMPEG
+    
+    # FFmpeg yo'q bo'lsa, hozir o'rnatish
+    if not _FFMPEG:
+        log.info("[FFMPEG]  Video uchun kerak - o'rnatilmoqda...")
+        _FFMPEG = _install_ffmpeg()
+        if not _FFMPEG:
+            return {"error": "ffmpeg_required", "message": "FFmpeg o'rnatilmadi"}
+    
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
@@ -659,7 +770,7 @@ def _download_video_sync(url: str, quality: int) -> Optional[dict]:
                 return {"error": "too_large", "size": round(size, 1)}
             return {
                 "file_path": str(fp),
-                "title":     info.get("title") or "Noma'lum",
+                "title":     info.get("title") or 'Nomalum',
                 "uploader":  info.get("uploader") or info.get("channel") or "",
                 "duration":  fmt_dur(info.get("duration")),
                 "dur_secs":  info.get("duration") or 0,
@@ -691,13 +802,13 @@ def kb_tracks(count: int, page: int = 0) -> InlineKeyboardMarkup:
     end = min(start + PER_PAGE, count)
     
     for i in range(start + 1, end + 1):
-        b.button(text=str(i), callback_data=f"t:{i-1}", style="primary")
+        b.button(text=str(i), callback_data=f"t:{i-1}")
     b.adjust(5)
     
     if end < count:
-        b.row(InlineKeyboardButton(text="📄 Keyingi →", callback_data=f"page:{page+1}", style="primary"))
+        b.row(InlineKeyboardButton(text="📄 Keyingi →", callback_data=f"page:{page+1}"))
     
-    b.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel", style="danger"))
+    b.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel"))
     return b.as_markup()
 
 def kb_video_formats(available_heights: list[int]) -> InlineKeyboardMarkup:
@@ -710,23 +821,23 @@ def kb_video_formats(available_heights: list[int]) -> InlineKeyboardMarkup:
     
     for label, h in quality_buttons:
         if not available_heights or any(ah >= h for ah in available_heights):
-            b.button(text=f"🎬 {label}", callback_data=f"vf:{h}", style="primary")
+            b.button(text=f"🎬 {label}", callback_data=f"vf:{h}")
     
-    b.button(text="🎬 Original video", callback_data="vf:0", style="primary")
+    b.button(text="🎬 Original video", callback_data="vf:0")
     b.adjust(4)
     b.row(
-        InlineKeyboardButton(text="🎵 MP3 Audio", callback_data="vf:mp3", style="success"),
-        InlineKeyboardButton(text="🖼 Preview rasm", callback_data="vf:pic", style="primary"),
+        InlineKeyboardButton(text="🎵 MP3 Audio", callback_data="vf:mp3"),
+        InlineKeyboardButton(text="🖼 Preview rasm", callback_data="vf:pic"),
     )
-    b.row(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel", style="danger"))
+    b.row(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel"))
     return b.as_markup()
 
 def kb_back(page: int = 0) -> InlineKeyboardMarkup:
     keyboard = [[]]
     if page > 0:
-        keyboard[0].append(InlineKeyboardButton(text="← Oldingi", callback_data=f"page:{page-1}", style="primary"))
-    keyboard[0].append(InlineKeyboardButton(text="🔍 Yangi qidiruv", callback_data="new_search", style="primary"))
-    keyboard[0].append(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel", style="danger"))
+        keyboard[0].append(InlineKeyboardButton(text="← Oldingi", callback_data=f"page:{page-1}"))
+    keyboard[0].append(InlineKeyboardButton(text="🔍 Yangi qidiruv", callback_data="new_search"))
+    keyboard[0].append(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel"))
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # ═══════════════════════════════════════════════════════
@@ -936,7 +1047,17 @@ async def _handle_search(msg: Message, query: str) -> None:
     )
     
     start_time = time.time()
-    tracks = await search_tracks(query)
+    try:
+        tracks = await search_tracks(query)
+    except Exception as ex:
+        log.error(f"[QIDIRUV XATO] {ex}", exc_info=True)
+        await status.edit_text(
+            f"❌ <b>Yuklab olishda xatolik yuz berdi.</b>\n\n"
+            f"🔄 Qayta urinib ko'ring.",
+            parse_mode=PM,
+        )
+        return
+    
     elapsed = time.time() - start_time
     
     if not tracks:
@@ -1025,6 +1146,8 @@ async def on_page(cb: CallbackQuery) -> None:
 # ───────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("t:"))
 async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
+    log.info(f"[CALLBACK] User {cb.from_user.id} selected track: {cb.data}")
+    
     uid  = cb.from_user.id
     idx  = int(cb.data.split(":")[1])
     sess = user_sessions.get(uid)
@@ -1037,19 +1160,24 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
     await cb.answer(f"⬇️ {track['title'][:40]}")
     
     name = cb.from_user.first_name if cb.from_user else "Foydalanuvchi"
-    log.info(f"📥 {name} - \"{track['title'][:30]}...\"")
+    log.info(f"📥 {name} (ID:{uid}) - \"{track['title'][:30]}...\" URL: {track['url'][:50]}")
     
     # Yangi xabar yuborish (eski xabarni o'chirmaslik)
     start_time = time.time()
-    progress_msg = await bot.send_message(
-        cb.message.chat.id,
-        f"📥 <b>Yuklanmoqda...</b>\n\n"
-        f"🎵 <b>{h(track['title'])}</b>\n"
-        f"👤 {h(track.get('uploader', ''))}\n"
-        f"⏱ {track.get('duration', '?')}\n\n"
-        f"⏳ Jarayon: <code>0%</code>",
-        parse_mode=PM,
-    )
+    try:
+        progress_msg = await bot.send_message(
+            cb.message.chat.id,
+            f"📥 <b>Yuklanmoqda...</b>\n\n"
+            f"🎵 <b>{h(track['title'])}</b>\n"
+            f"👤 {h(track.get('uploader', ''))}\n"
+            f"⏱ {track.get('duration', '?')}\n\n"
+            f"⏳ Jarayon: <code>0%</code>",
+            parse_mode=PM,
+        )
+    except Exception as e:
+        log.error(f"[XABAR YUBORISHDA XATO] {e}")
+        await cb.answer("❌ Xato yuz berdi", show_alert=True)
+        return
     
     # Progress update task (Optimizatsiya: umumiy funksiya)
     download_complete = [False]
@@ -1057,9 +1185,26 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
         update_progress_bar(progress_msg, track, start_time, download_complete, "🎵")
     )
     
-    result = await download_audio(track["url"])
+    try:
+        log.info(f"[DOWNLOAD START] URL: {track['url']}")
+        result = await download_audio(track["url"])
+        log.info(f"[DOWNLOAD RESULT] {result}")
+    except Exception as e:
+        log.error(f"[DOWNLOAD EXCEPTION] {e}", exc_info=True)
+        result = {"error": "exception", "message": str(e)}
+    
     download_complete[0] = True
     progress_task.cancel()
+    
+    if not result:
+        log.error(f"[YUKLAB OLISH] result=None, url={track['url']}")
+        await progress_msg.edit_text("❌ Yuklab olishda xato yuz berdi. Qaytadan urinib ko'ring.")
+        return
+    elif result.get("error"):
+        log.error(f"[YUKLAB OLISH] error={result.get('error')}, url={track['url']}")
+        error_msg = result.get("message", "Noma'lum xato")
+        await progress_msg.edit_text(f"❌ Xato: {error_msg}\n\nQaytadan urinib ko'ring.")
+        return
     
     elapsed = time.time() - start_time
     
@@ -1119,7 +1264,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 cb.message.chat.id,
                 photo=thumb_url,
                 caption=f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>0%</code>\n"
@@ -1131,7 +1276,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             progress_msg = await bot.send_message(
                 cb.message.chat.id,
                 f"📥 <b>Yuklanmoqda...</b>\n\n"
-                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>0%</code>\n"
@@ -1142,7 +1287,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         progress_msg = await bot.send_message(
             cb.message.chat.id,
             f"📥 <b>Yuklanmoqda...</b>\n\n"
-            f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+            f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
             f"👤 {h(info.get('uploader', ''))}\n"
             f"⏱ {info.get('duration', '?')}\n\n"
             f"⏳ Jarayon: <code>0%</code>\n"
@@ -1164,7 +1309,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     if progress_msg.photo:
                         await progress_msg.edit_caption(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1174,7 +1319,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     else:
                         await progress_msg.edit_text(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1197,7 +1342,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             if progress_msg.photo:
                 await progress_msg.edit_caption(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1207,7 +1352,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             else:
                 await progress_msg.edit_text(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1247,7 +1392,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 if progress_msg.photo:
                     await progress_msg.edit_caption(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1257,7 +1402,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 else:
                     await progress_msg.edit_text(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1280,7 +1425,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         if progress_msg.photo:
             await progress_msg.edit_caption(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
@@ -1291,7 +1436,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         else:
             await progress_msg.edit_text(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
@@ -1390,7 +1535,7 @@ async def _deliver_audio(bot: Bot, chat_id: int, result: Optional[dict], meta: d
             caption=caption,
             parse_mode=PM,
             thumbnail=thumb_file,
-            title=result.get("title", "Noma'lum"),
+            title=result.get("title", 'Nomalum'),
             performer=result.get("uploader", ""),
             duration=result.get("dur_secs", 0),
             request_timeout=300  # 5 daqiqa timeout
@@ -1412,7 +1557,7 @@ async def _deliver_audio(bot: Bot, chat_id: int, result: Optional[dict], meta: d
                 audio=FSInputFile(str(fp), filename=filename),
                 caption=caption,
                 parse_mode=PM,
-                title=result.get("title", "Noma'lum"),
+                title=result.get("title", 'Nomalum'),
                 performer=result.get("uploader", ""),
                 duration=result.get("dur_secs", 0),
                 request_timeout=300  # 5 daqiqa timeout
@@ -1597,26 +1742,26 @@ async def _report_scheduler(bot: Bot) -> None:
         await _send_daily_report(bot)
 
 # ═══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
 # 14. HEALTH CHECK SERVER (Render uchun)
 # ═══════════════════════════════════════════════════════
-from aiohttp import web
-
-async def health_check(request):
-    """Render health check endpoint"""
-    return web.Response(text="OK", status=200)
-
-async def start_health_server():
-    """Health check server ishga tushirish"""
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
+async def health_check_server():
+    """Render uchun HTTP health check server"""
+    from aiohttp import web
     
-    port = int(os.getenv('PORT', 8080))
+    async def health(request):
+        return web.Response(text="OK", status=200)
+    
+    app = web.Application()
+    app.router.add_get('/health', health)
+    app.router.add_get('/', health)
+    
+    port = int(os.getenv('PORT', 10000))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    log.info(f"🌐 Health check server ishga tushdi: port {port}")
+    log.info(f"🌐 HTTP server ishga tushdi: port {port}")
 
 # ═══════════════════════════════════════════════════════
 # 15. MAIN
@@ -1624,21 +1769,37 @@ async def start_health_server():
 async def main() -> None:
     log.info("⚙️  Bot sozlanmoqda...")
     
+    # BOT_TOKEN tekshirish
+    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+        log.error("❌ BOT_TOKEN topilmadi! Environment variable sozlang.")
+        print("\n❌ XATO: BOT_TOKEN environment variable sozlanmagan!\n")
+        print("Render.com'da Environment Variables bo'limiga kiring va qo'shing:")
+        print("  Key: BOT_TOKEN")
+        print("  Value: 8619790841:AAHq4PRVLsltrM4AUwX3RyLGX4MAFqUW7FM\n")
+        return
+    
+    log.info(f"🔑 BOT_TOKEN: {BOT_TOKEN[:20]}...")
+    
     bot = Bot(token=BOT_TOKEN)
     dp  = Dispatcher()
     dp.include_router(router)
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-    except Exception:
-        pass
+    except Exception as e:
+        log.error(f"❌ Webhook o'chirishda xato: {e}")
+        print(f"\n❌ XATO: Bot Telegram'ga ulanolmadi!\n")
+        print(f"Sabab: {e}\n")
+        print("BOT_TOKEN to'g'ri ekanligini tekshiring.\n")
+        return
 
     me = await bot.get_me()
     log.info(f"✅ Bot tayyor: @{me.username}")
     log.info("👂 Xabarlar kutilmoqda...\n")
 
-    # Health check server ishga tushirish (Render uchun)
-    asyncio.create_task(start_health_server())
+    # HTTP server ishga tushirish (Render uchun)
+    asyncio.create_task(health_check_server())
+    
     asyncio.create_task(_cleanup_loop())
     asyncio.create_task(_report_scheduler(bot))
     try:

@@ -2,8 +2,10 @@ services:
   - type: web
     name: navohub-bot
     env: python
-    region: oregon
+    region: frankfurt
     plan: free
+    branch: main
+    autoDeploy: true
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
@@ -14,9 +16,8 @@ services:
       - key: BOT_TOKEN
         sync: false
       - key: PORT
-        value: 8080
+        value: 10000
     healthCheckPath: /health
-    autoDeploy: true
     disk:
       name: navohub-data
       mountPath: /opt/render/project/src/data

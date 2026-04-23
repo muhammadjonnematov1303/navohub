@@ -12,12 +12,33 @@ pip install -r requirements.txt
 cp config/.env.example config/.env
 # Edit config/.env and add your BOT_TOKEN
 
+# Setup YouTube cookies (IMPORTANT!)
+python scripts/setup_cookies.py
+# Or manually: docs/COOKIES.md
+
 # Run bot (Production)
 python bot.py
 
 # Run bot (Development - Auto-reload)
 python dev.py
 ```
+
+## 🍪 YouTube Cookie Setup (REQUIRED)
+
+YouTube bot detection'dan qochish uchun cookie kerak:
+
+```bash
+# Lokal kompyuter (avtomatik)
+python scripts/setup_cookies.py
+
+# Server (manual)
+# 1. Chrome extension: "Get cookies.txt LOCALLY"
+# 2. YouTube'ga login qiling
+# 3. Cookie export qiling
+# 4. scripts/cookies.txt ga joylang
+```
+
+To'liq qo'llanma: [docs/COOKIES.md](docs/COOKIES.md)
 
 ## 🔥 Development Mode
 

@@ -1,6 +1,9 @@
 # Environment
 config/.env
 
+# Cookies (XAVFSIZLIK!)
+scripts/cookies.txt
+
 # Data files
 data/users.json
 data/stats.json
@@ -16,6 +19,7 @@ venv/
 
 # FFmpeg
 ffmpeg/
+ffmpeg_tmp.zip
 
 # Logs
 *.log
