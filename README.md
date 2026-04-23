@@ -46,10 +46,56 @@ docker run -d --name navohub-bot -e BOT_TOKEN="your_token" navohub-bot
 
 ## ☁️ Cloud Deployment
 
-- **Heroku**: `git push heroku main`
-- **Railway**: `railway up`
-- **Render**: `render.yaml` ishlatadi
-- **VPS**: Systemd service
+### Render (Tavsiya etiladi - Bepul)
+
+1. **GitHub'ga push qiling:**
+   ```bash
+   git add .
+   git commit -m "Ready for Render deployment"
+   git push origin main
+   ```
+
+2. **Render.com'da:**
+   - [Render Dashboard](https://dashboard.render.com) ga kiring
+   - "New +" → "Blueprint" tanlang
+   - GitHub repository'ni ulang
+   - `render.yaml` avtomatik topiladi
+   - Environment Variables'ga `BOT_TOKEN` qo'shing
+   - "Apply" bosing
+
+3. **Deploy tugagach:**
+   - Bot avtomatik ishga tushadi
+   - Health check `/health` endpoint orqali ishlaydi
+   - Logs'ni Render dashboard'dan ko'ring
+
+**Render xususiyatlari:**
+- ✅ Bepul plan (750 soat/oy)
+- ✅ Avtomatik deploy (git push)
+- ✅ 1GB disk space
+- ✅ SSL sertifikat
+- ✅ Health check monitoring
+
+### Railway
+
+```bash
+railway login
+railway init
+railway up
+```
+
+### Heroku
+
+```bash
+git push heroku main
+```
+
+### VPS (Ubuntu/Debian)
+
+```bash
+# Systemd service
+sudo systemctl enable navohub-bot
+sudo systemctl start navohub-bot
+```
 
 To'liq qo'llanma: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 

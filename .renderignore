@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+
+# Data (will be created on server)
+data/users.json
+data/stats.json
+data/activity.log
+
+# FFmpeg (will be installed on server)
+ffmpeg/
+
+# Logs
+*.log
+
+# Development
+dev.py
+TEST_*.md
+
+# IDE
+.vscode
+.idea
+.claude
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker files (not needed on Render)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Railway files
+railway.toml
+Procfile

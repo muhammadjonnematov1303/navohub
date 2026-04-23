@@ -123,25 +123,106 @@ railway logs
 
 ---
 
-## 🎨 Render
+## 🎨 Render (Tavsiya Etiladi - Bepul)
 
-### 1. Web Dashboard
+### 1. GitHub'ga Push
 
-1. https://render.com ga kiring
-2. "New +" → "Web Service"
-3. GitHub repository ulang
-4. Sozlamalar:
+```bash
+# Barcha o'zgarishlarni commit qiling
+git add .
+git commit -m "Ready for Render deployment"
+git push origin main
+```
+
+### 2. Render Dashboard
+
+1. [Render.com](https://render.com) ga kiring (GitHub bilan)
+2. "New +" → "Blueprint" tanlang
+3. GitHub repository'ni ulang
+4. `render.yaml` avtomatik topiladi va quyidagi sozlamalar qo'llaniladi:
+   - **Service Type**: Web Service
    - **Name**: navohub-bot
    - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
+   - **Region**: Oregon (yoki yaqin region)
+   - **Plan**: Free
+   - **Build Command**: `pip install --upgrade pip && pip install -r requirements.txt && mkdir -p data scripts`
    - **Start Command**: `python bot.py`
-5. Environment Variables:
-   - `BOT_TOKEN`: your_bot_token_here
-6. "Create Web Service"
+   - **Health Check**: `/health` endpoint
 
-### 2. render.yaml (Auto-deploy)
+### 3. Environment Variables
 
-Repository'da `render.yaml` fayli bor. Render avtomatik aniqlaydi.
+Render dashboard'da Environment Variables qo'shing:
+
+```
+BOT_TOKEN=your_bot_token_here
+PORT=8080
+```
+
+### 4. Deploy
+
+"Apply" tugmasini bosing. Render avtomatik:
+- Repository'ni clone qiladi
+- Dependencies o'rnatadi
+- Bot'ni ishga tushiradi
+- Health check orqali monitoring qiladi
+
+### 5. Monitoring
+
+```bash
+# Render dashboard'da:
+- Logs: Real-time loglarni ko'rish
+- Metrics: CPU, Memory, Network
+- Events: Deploy history
+- Shell: SSH access (paid plans)
+```
+
+### 6. Auto-Deploy
+
+Har safar `git push` qilganingizda, Render avtomatik yangi versiyani deploy qiladi.
+
+### Render Xususiyatlari
+
+**Bepul Plan:**
+- ✅ 750 soat/oy (1 service uchun)
+- ✅ 512 MB RAM
+- ✅ 1 GB disk space
+- ✅ Avtomatik SSL
+- ✅ Health check monitoring
+- ✅ GitHub auto-deploy
+- ⚠️ 15 daqiqa inactivity'dan keyin sleep mode
+
+**Paid Plans ($7/mo):**
+- ✅ 24/7 uptime (sleep yo'q)
+- ✅ 2 GB RAM
+- ✅ SSH access
+- ✅ Custom domains
+
+### Render vs Boshqalar
+
+| Feature | Render | Heroku | Railway |
+|---------|--------|--------|---------|
+| Bepul plan | ✅ 750h | ❌ Yo'q | ✅ $5 credit |
+| Auto-deploy | ✅ | ✅ | ✅ |
+| Sleep mode | ⚠️ 15min | ⚠️ 30min | ❌ Yo'q |
+| Disk space | 1 GB | 512 MB | 1 GB |
+| Setup | Oson | O'rtacha | Oson |
+
+### Troubleshooting
+
+**Bot sleep mode'ga tushadi?**
+- Bepul plan'da 15 daqiqa inactivity'dan keyin sleep
+- Birinchi request'da 30-60 soniya wake up vaqti
+- Yechim: Paid plan ($7/mo) yoki cron job bilan ping
+
+**Health check fail?**
+- `/health` endpoint ishlayotganini tekshiring
+- Logs'da xatolarni qidiring
+- PORT environment variable to'g'ri o'rnatilganini tekshiring
+
+**Deploy fails?**
+- `requirements.txt` to'g'ri formatda ekanligini tekshiring
+- Python version'ni tekshiring (3.11)
+- Build logs'ni o'qing
 
 ---
 
