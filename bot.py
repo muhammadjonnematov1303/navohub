@@ -603,51 +603,103 @@ async def get_url_info(url: str) -> Optional[dict]:
     return await asyncio.get_event_loop().run_in_executor(_pool, _url_info_sync, url)
 
 def _download_audio_sync(url: str) -> Optional[dict]:
-    """Audio yuklab olish (MP3)"""
+    """
+    Audio yuklab olish va MP3 ga konvertatsiya qilish
+    
+    Returns:
+        dict: {"file_path": str, "title": str, ...} yoki {"error": str}
+        None: Fayl topilmadi
+    """
     fname = f"navo_{int(time.time()*1000)}"
-    opts  = {
+    output_template = str(TEMP_DIR / f"{fname}.%(ext)s")
+    
+    # yt-dlp sozlamalari
+    opts = {
         **_ydl_base_opts(),
-        "outtmpl": str(TEMP_DIR / f"{fname}.%(ext)s"),
+        "outtmpl": output_template,
+        "format": "bestaudio/best",  # Eng yaxshi audio
     }
     
-    # FFmpeg bilan MP3 ga konvertatsiya
+    # FFmpeg bilan MP3 konvertatsiya
     if _FFMPEG:
         opts["ffmpeg_location"] = str(Path(_FFMPEG).parent)
-        opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
         opts["postprocessors"] = [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-            "preferredquality": "128"
+            "preferredquality": "128",
         }]
+        log.info(f"[FFMPEG] Ishlatilmoqda: {_FFMPEG}")
     else:
-        # FFmpeg yo'q bo'lsa, to'g'ridan-to'g'ri audio
-        opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+        log.warning("[FFMPEG] Topilmadi - audio formatda yuklanadi")
     
+    # Yuklab olish
     try:
-        log.info(f"[YUKLAB OLISH BOSHLANDI] {url[:60]}")
+        log.info(f"[DOWNLOAD START] URL: {url[:70]}")
         
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         
         if not info:
-            log.error("[YUKLAB OLISH] info=None")
-            return {"error": "failed"}
+            log.error("[DOWNLOAD] info=None - video topilmadi")
+            return {"error": "not_found"}
         
-        log.info(f"[YUKLAB OLISH TUGADI] {info.get('title', '')[:50]}")
+        title = info.get('title', 'Nomalum')
+        log.info(f"[DOWNLOAD SUCCESS] {title[:50]}")
         
     except yt_dlp.utils.DownloadError as ex:
-        log.error(f"[DOWNLOAD ERROR] {str(ex)}", exc_info=True)
-        return {"error": "failed"}
+        error_msg = str(ex)
+        log.error(f"[DOWNLOAD ERROR] {error_msg}", exc_info=True)
+        
+        # YouTube bot detection
+        if "Sign in" in error_msg or "bot" in error_msg.lower():
+            log.error("[YOUTUBE BOT DETECTION] Cookies kerak!")
+            return {"error": "bot_detected"}
+        
+        return {"error": "download_failed"}
+        
     except Exception as ex:
-        log.error(f"[MP3 XATO] {str(ex)}", exc_info=True)
+        log.error(f"[UNEXPECTED ERROR] {str(ex)}", exc_info=True)
         return {"error": "failed"}
-
-    for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
+    
+    # Yuklab olingan faylni topish
+    possible_extensions = ["mp3", "m4a", "webm", "opus", "ogg", "mp4"]
+    found_file = None
+    
+    for ext in possible_extensions:
         fp = TEMP_DIR / f"{fname}.{ext}"
         if fp.exists():
-            size = fp.stat().st_size / 1_048_576
-            if size > MAX_FILE_MB:
-                fp.unlink()
+            found_file = fp
+            log.info(f"[FILE FOUND] {fp.name} ({fp.stat().st_size / 1_048_576:.1f} MB)")
+            break
+    
+    if not found_file:
+        log.error(f"[FILE NOT FOUND] Qidirildi: {fname}.{{mp3,m4a,webm,...}}")
+        log.error(f"[TEMP DIR] {TEMP_DIR}")
+        # Temp papkadagi fayllarni ko'rsatish
+        try:
+            files = list(TEMP_DIR.glob(f"{fname}*"))
+            log.error(f"[TEMP FILES] {[f.name for f in files]}")
+        except Exception:
+            pass
+        return {"error": "file_not_found"}
+    
+    # Fayl hajmini tekshirish
+    size_mb = found_file.stat().st_size / 1_048_576
+    if size_mb > MAX_FILE_MB:
+        log.warning(f"[FILE TOO LARGE] {size_mb:.1f} MB > {MAX_FILE_MB} MB")
+        found_file.unlink()
+        return {"error": "too_large", "size": round(size_mb, 1)}
+    
+    # Muvaffaqiyatli natija
+    return {
+        "file_path": str(found_file),
+        "title": info.get("title", "Nomalum"),
+        "uploader": info.get("uploader") or info.get("channel") or "",
+        "duration": fmt_dur(info.get("duration")),
+        "dur_secs": info.get("duration") or 0,
+        "size_mb": round(size_mb, 1),
+        "thumbnail": f"https://i.ytimg.com/vi/{info.get('id','')}/hqdefault.jpg",
+    }
                 return {"error": "too_large", "size": round(size, 1)}
             return {
                 "file_path": str(fp),
