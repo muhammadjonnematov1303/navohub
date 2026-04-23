@@ -19,6 +19,7 @@ venv/
 
 # FFmpeg
 ffmpeg/
+ffmpeg_tmp.zip
 
 # Logs
 *.log

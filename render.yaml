@@ -2,6 +2,10 @@ services:
   - type: web
     name: navohub-bot
     env: python
+    region: frankfurt
+    plan: free
+    branch: main
+    autoDeploy: true
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
