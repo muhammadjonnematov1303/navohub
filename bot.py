@@ -1742,14 +1742,29 @@ async def health_check_server():
 async def main() -> None:
     log.info("⚙️  Bot sozlanmoqda...")
     
+    # BOT_TOKEN tekshirish
+    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+        log.error("❌ BOT_TOKEN topilmadi! Environment variable sozlang.")
+        print("\n❌ XATO: BOT_TOKEN environment variable sozlanmagan!\n")
+        print("Render.com'da Environment Variables bo'limiga kiring va qo'shing:")
+        print("  Key: BOT_TOKEN")
+        print("  Value: 8619790841:AAHq4PRVLsltrM4AUwX3RyLGX4MAFqUW7FM\n")
+        return
+    
+    log.info(f"🔑 BOT_TOKEN: {BOT_TOKEN[:20]}...")
+    
     bot = Bot(token=BOT_TOKEN)
     dp  = Dispatcher()
     dp.include_router(router)
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-    except Exception:
-        pass
+    except Exception as e:
+        log.error(f"❌ Webhook o'chirishda xato: {e}")
+        print(f"\n❌ XATO: Bot Telegram'ga ulanolmadi!\n")
+        print(f"Sabab: {e}\n")
+        print("BOT_TOKEN to'g'ri ekanligini tekshiring.\n")
+        return
 
     me = await bot.get_me()
     log.info(f"✅ Bot tayyor: @{me.username}")
