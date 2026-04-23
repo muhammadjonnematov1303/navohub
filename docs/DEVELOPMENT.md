@@ -103,4 +103,4 @@ pip install watchdog
 ---
 
 **Dasturchi:** @MuhammadjonXP  
-**Sana:** 2024-12-23
+**Sana:** 21.04.2026

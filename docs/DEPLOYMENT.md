@@ -473,3 +473,6 @@ Muammo bo'lsa:
 ---
 
 **Muvaffaqiyatli deploy qiling!** 🚀
+
+**Dasturchi:** @MuhammadjonXP  
+**Sana:** 21.04.2026

@@ -2,7 +2,7 @@
 
 ## 📊 Umumiy Ma'lumot
 
-**Sana:** 2024-12-23  
+**Sana:** 21.04.2026  
 **Versiya:** 2.0 (Ultra Tez)  
 **Maqsad:** Yuklab olish tezligini 5 minutdan 10 soniyaga tushirish
 
@@ -180,4 +180,4 @@ Bot endi **20 marta tezroq** ishlaydi! Foydalanuvchilar 5 minut o'rniga faqat 10
 ---
 
 **Optimizatsiya qilindi:** @MuhammadjonXP  
-**Sana:** 2024-12-23
+**Sana:** 21.04.2026
