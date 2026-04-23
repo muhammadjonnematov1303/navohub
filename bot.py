@@ -301,7 +301,7 @@ async def update_progress_bar(
         progress = min(95, progress + 20)  # 15 -> 20 (tezroq o'sish)
         elapsed = time.time() - start_time
         try:
-            title = info.get('title', "Noma'lum")
+            title = info.get('title', 'Nomalum')
             uploader = info.get('uploader', '')
             duration = info.get('duration', '?')
             caption_text = (
@@ -336,7 +336,7 @@ async def show_completion(
         media_type: "🎵" yoki "🎬"
     """
     try:
-        title = info.get('title', "Noma'lum")
+        title = info.get('title', 'Nomalum')
         uploader = info.get('uploader', '')
         duration = info.get('duration', '?')
         caption_text = (
@@ -425,7 +425,7 @@ async def _search_innertube(query: str) -> list[dict]:
                 vid_id = vr.get("videoId")
                 if not vid_id:
                     continue
-                title    = vr.get("title",     {}).get("runs", [{}])[0].get("text", "Noma'lum")
+                title    = vr.get("title",     {}).get("runs", [{}])[0].get("text", 'Nomalum')
                 uploader = vr.get("ownerText", {}).get("runs", [{}])[0].get("text", "")
                 dur_text = vr.get("lengthText", {}).get("simpleText", "")
                 dur_secs = _dur_to_sec(dur_text)
@@ -476,7 +476,7 @@ def _search_ytdlp_fallback(query: str) -> list[dict]:
             vid_id = e["id"]
             out.append({
                 "id":        vid_id,
-                "title":     e.get("title") or "Noma'lum",
+                "title":     e.get("title") or 'Nomalum',
                 "uploader":  e.get("uploader") or e.get("channel") or "",
                 "duration":  fmt_dur(dur),
                 "dur_secs":  dur,
@@ -555,7 +555,7 @@ def _url_info_sync(url: str) -> Optional[dict]:
             return None
         
         vid_id = info.get("id", "")
-        title = info.get("title") or "Noma'lum"
+        title = info.get("title") or 'Nomalum'
         log.info("[URL INFO]  Topildi: %s", title[:50])
         
         # Thumbnail olish (turli manbalar)
@@ -622,7 +622,7 @@ def _download_audio_sync(url: str) -> Optional[dict]:
                 return {"error": "too_large", "size": round(size, 1)}
             return {
                 "file_path": str(fp),
-                "title":     info.get("title") or "Noma'lum",
+                "title":     info.get("title") or 'Nomalum',
                 "uploader":  info.get("uploader") or info.get("channel") or "",
                 "duration":  fmt_dur(info.get("duration")),
                 "dur_secs":  info.get("duration") or 0,
@@ -665,7 +665,7 @@ def _download_video_sync(url: str, quality: int) -> Optional[dict]:
                 return {"error": "too_large", "size": round(size, 1)}
             return {
                 "file_path": str(fp),
-                "title":     info.get("title") or "Noma'lum",
+                "title":     info.get("title") or 'Nomalum',
                 "uploader":  info.get("uploader") or info.get("channel") or "",
                 "duration":  fmt_dur(info.get("duration")),
                 "dur_secs":  info.get("duration") or 0,
@@ -1125,7 +1125,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 cb.message.chat.id,
                 photo=thumb_url,
                 caption=f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>0%</code>\n"
@@ -1137,7 +1137,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             progress_msg = await bot.send_message(
                 cb.message.chat.id,
                 f"📥 <b>Yuklanmoqda...</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>0%</code>\n"
@@ -1148,7 +1148,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         progress_msg = await bot.send_message(
             cb.message.chat.id,
             f"📥 <b>Yuklanmoqda...</b>\n\n"
-            f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+            f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
             f"👤 {h(info.get('uploader', ''))}\n"
             f"⏱ {info.get('duration', '?')}\n\n"
             f"⏳ Jarayon: <code>0%</code>\n"
@@ -1170,7 +1170,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     if progress_msg.photo:
                         await progress_msg.edit_caption(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1180,7 +1180,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     else:
                         await progress_msg.edit_text(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1203,7 +1203,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             if progress_msg.photo:
                 await progress_msg.edit_caption(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1213,7 +1213,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             else:
                 await progress_msg.edit_text(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1253,7 +1253,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 if progress_msg.photo:
                     await progress_msg.edit_caption(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1263,7 +1263,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 else:
                     await progress_msg.edit_text(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1286,7 +1286,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         if progress_msg.photo:
             await progress_msg.edit_caption(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
@@ -1297,7 +1297,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         else:
             await progress_msg.edit_text(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Nomalum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
@@ -1396,7 +1396,7 @@ async def _deliver_audio(bot: Bot, chat_id: int, result: Optional[dict], meta: d
             caption=caption,
             parse_mode=PM,
             thumbnail=thumb_file,
-            title=result.get("title", "Noma'lum"),
+            title=result.get("title", 'Nomalum'),
             performer=result.get("uploader", ""),
             duration=result.get("dur_secs", 0),
             request_timeout=300  # 5 daqiqa timeout
@@ -1418,7 +1418,7 @@ async def _deliver_audio(bot: Bot, chat_id: int, result: Optional[dict], meta: d
                 audio=FSInputFile(str(fp), filename=filename),
                 caption=caption,
                 parse_mode=PM,
-                title=result.get("title", "Noma'lum"),
+                title=result.get("title", 'Nomalum'),
                 performer=result.get("uploader", ""),
                 duration=result.get("dur_secs", 0),
                 request_timeout=300  # 5 daqiqa timeout
