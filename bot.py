@@ -518,7 +518,7 @@ async def search_tracks(query: str) -> list[dict]:
 # 9. YT-DLP YUKLAB OLISH
 # ═══════════════════════════════════════════════════════
 def _ydl_base_opts() -> dict:
-    """yt-dlp uchun optimal sozlamalar"""
+    """yt-dlp uchun optimal sozlamalar - YouTube bot detection bypass"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -529,17 +529,15 @@ def _ydl_base_opts() -> dict:
         "fragment_retries": 10,
         "no_check_certificate": True,
         "geo_bypass": True,
-        # YouTube bot detection bypass
+        # YouTube bot detection bypass - tv_embedded eng yaxshi
         "extractor_args": {
             "youtube": {
-                "player_client": ["android_creator"],  # Eng ishonchli client
-                "skip": ["hls"],
+                "player_client": ["tv_embedded"],  # TV client - bot detection yo'q
+                "skip": ["hls", "dash"],
             },
         },
         "http_chunk_size": 10_485_760,
         "concurrent_fragment_downloads": 4,
-        # User agent
-        "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
