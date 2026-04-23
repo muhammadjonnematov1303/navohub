@@ -120,17 +120,19 @@ logging.basicConfig(
     force=True
 )
 log = logging.getLogger("NavoHub")
+log.setLevel(logging.INFO)
 
 # Aiogram va boshqa kutubxonalarning xatolarini butunlay yashirish
 logging.getLogger("aiogram").setLevel(logging.CRITICAL)
 logging.getLogger("aiogram.event").setLevel(logging.CRITICAL)
 logging.getLogger("aiohttp").setLevel(logging.CRITICAL)
-logging.getLogger("yt_dlp").setLevel(logging.CRITICAL)
+logging.getLogger("yt_dlp").setLevel(logging.WARNING)  # CRITICAL -> WARNING (xatolarni ko'rish uchun)
 
 # Darhol test xabari
 print("\n" + "=" * 50, flush=True)
 print("  🎵 NavoHub Bot", flush=True)
 print("=" * 50, flush=True)
+log.info("🚀 Bot yuklanmoqda...")
 
 # ═══════════════════════════════════════════════════════
 # 4. XOTIRA VA KESH
@@ -541,13 +543,13 @@ async def search_tracks(query: str) -> list[dict]:
 def _ydl_base_opts() -> dict:
     """yt-dlp uchun optimal sozlamalar - YouTube bot detection bypass"""
     opts = {
-        "quiet": True,
-        "no_warnings": True,
+        "quiet": False,  # True -> False (xatolarni ko'rish uchun)
+        "no_warnings": False,  # True -> False
         "ignoreerrors": False,
         "noplaylist": True,
-        "socket_timeout": 30,
-        "retries": 10,
-        "fragment_retries": 10,
+        "socket_timeout": 20,  # 30 -> 20 (tezroq)
+        "retries": 5,  # 10 -> 5 (tezroq)
+        "fragment_retries": 5,  # 10 -> 5
         "no_check_certificate": True,
         "geo_bypass": True,
         # YouTube bot detection bypass - tv_embedded eng yaxshi
@@ -557,12 +559,14 @@ def _ydl_base_opts() -> dict:
                 "skip": ["hls", "dash"],
             },
         },
-        "http_chunk_size": 10_485_760,
-        "concurrent_fragment_downloads": 4,
+        "http_chunk_size": 10_485_760,  # 10MB chunks
+        "concurrent_fragment_downloads": 8,  # 4 -> 8 (2x tezroq)
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
-        log.info("[COOKIE]  cookies.txt ishlatilmoqda")
+        log.info("[COOKIE]  ✅ cookies.txt ishlatilmoqda")
+    else:
+        log.warning("[COOKIE]  ⚠️  cookies.txt topilmadi - YouTube bloklashi mumkin!")
     return opts
 
 def _url_info_sync(url: str) -> Optional[dict]:
