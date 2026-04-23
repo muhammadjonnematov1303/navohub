@@ -1605,6 +1605,24 @@ async def _report_scheduler(bot: Bot) -> None:
 # ═══════════════════════════════════════════════════════
 # 14. MAIN
 # ═══════════════════════════════════════════════════════
+async def health_check_server():
+    """Render uchun HTTP health check server"""
+    from aiohttp import web
+    
+    async def health(request):
+        return web.Response(text="OK", status=200)
+    
+    app = web.Application()
+    app.router.add_get('/health', health)
+    app.router.add_get('/', health)
+    
+    port = int(os.getenv('PORT', 10000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    log.info(f"🌐 HTTP server ishga tushdi: port {port}")
+
 async def main() -> None:
     log.info("⚙️  Bot sozlanmoqda...")
     
@@ -1621,6 +1639,9 @@ async def main() -> None:
     log.info(f"✅ Bot tayyor: @{me.username}")
     log.info("👂 Xabarlar kutilmoqda...\n")
 
+    # HTTP server ishga tushirish (Render uchun)
+    asyncio.create_task(health_check_server())
+    
     asyncio.create_task(_cleanup_loop())
     asyncio.create_task(_report_scheduler(bot))
     try:
