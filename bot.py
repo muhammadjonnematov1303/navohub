@@ -522,19 +522,19 @@ def _ydl_base_opts() -> dict:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 10,
-        "retries":        3,
-        "fragment_retries": 3,
+        "socket_timeout": 15,
+        "retries":        5,
+        "fragment_retries": 5,
         "no_check_certificate": True,
         "geo_bypass": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android"],  # Faqat android (bot detection bypass)
+                "player_client": ["ios", "android"],  # iOS eng ishonchli
                 "skip": ["hls", "dash"],
             },
         },
         "http_chunk_size": 10_485_760,
-        "concurrent_fragment_downloads": 16,
+        "concurrent_fragment_downloads": 8,
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
