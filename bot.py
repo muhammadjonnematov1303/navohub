@@ -374,10 +374,24 @@ def _find_ffmpeg() -> Optional[str]:
     return str(_FFMPEG_BIN) if _FFMPEG_BIN.exists() else None
 
 def _install_ffmpeg() -> Optional[str]:
+    """FFmpeg'ni yuklab olish va o'rnatish (progress bilan)"""
     log.info("[FFMPEG]  Yuklanmoqda...")
     zip_path = Path(__file__).parent / "ffmpeg_tmp.zip"
+    
     try:
-        urllib.request.urlretrieve(_FFMPEG_URL, zip_path)
+        # Progress callback
+        def show_progress(block_num, block_size, total_size):
+            downloaded = block_num * block_size
+            if total_size > 0:
+                percent = min(100, (downloaded * 100) // total_size)
+                if percent % 10 == 0:  # Har 10% da ko'rsatish
+                    print(f"\r[FFMPEG]  Yuklanmoqda... {percent}%", end="", flush=True)
+        
+        print("[FFMPEG]  Yuklanmoqda... 0%", end="", flush=True)
+        urllib.request.urlretrieve(_FFMPEG_URL, zip_path, reporthook=show_progress)
+        print("\r[FFMPEG]  Yuklanmoqda... 100%")
+        
+        log.info("[FFMPEG]  Arxiv ochilmoqda...")
         with zipfile.ZipFile(zip_path, "r") as zf:
             for m in zf.namelist():
                 if "/bin/ffmpeg.exe" in m or "/bin/ffprobe.exe" in m:
@@ -386,13 +400,19 @@ def _install_ffmpeg() -> Optional[str]:
                     fname = Path(m).name
                     with zf.open(m) as src, open(bin_dir / fname, "wb") as dst:
                         shutil.copyfileobj(src, dst)
+        
         zip_path.unlink()
-        log.info("[FFMPEG]  O'rnatildi: %s", _FFMPEG_BIN)
+        log.info("[FFMPEG]  ✅ O'rnatildi: %s", _FFMPEG_BIN)
         return str(_FFMPEG_BIN)
+        
     except Exception as ex:
-        log.warning("[FFMPEG]  O'rnatishda xato: %s", ex)
+        print(f"\n[FFMPEG]  ❌ Xato: {ex}")
+        log.error("[FFMPEG]  O'rnatishda xato: %s", ex, exc_info=True)
         if zip_path.exists():
-            zip_path.unlink()
+            try:
+                zip_path.unlink()
+            except:
+                pass
         return None
 
 _FFMPEG = _find_ffmpeg() or _install_ffmpeg()
