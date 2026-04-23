@@ -518,23 +518,28 @@ async def search_tracks(query: str) -> list[dict]:
 # 9. YT-DLP YUKLAB OLISH
 # ═══════════════════════════════════════════════════════
 def _ydl_base_opts() -> dict:
+    """yt-dlp uchun optimal sozlamalar"""
     opts = {
-        "quiet":          True,
-        "no_warnings":    True,
-        "ignoreerrors":   False,
-        "noplaylist":     True,
-        "socket_timeout": 20,
-        "retries":        5,
-        "fragment_retries": 5,
+        "quiet": True,
+        "no_warnings": True,
+        "ignoreerrors": False,
+        "noplaylist": True,
+        "socket_timeout": 30,
+        "retries": 10,
+        "fragment_retries": 10,
         "no_check_certificate": True,
         "geo_bypass": True,
+        # YouTube bot detection bypass
         "extractor_args": {
             "youtube": {
-                "player_client": ["mweb", "android"],  # mweb eng ishonchli
+                "player_client": ["android_creator"],  # Eng ishonchli client
+                "skip": ["hls"],
             },
         },
         "http_chunk_size": 10_485_760,
-        "concurrent_fragment_downloads": 8,
+        "concurrent_fragment_downloads": 4,
+        # User agent
+        "user_agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip",
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
@@ -600,28 +605,43 @@ async def get_url_info(url: str) -> Optional[dict]:
     return await asyncio.get_event_loop().run_in_executor(_pool, _url_info_sync, url)
 
 def _download_audio_sync(url: str) -> Optional[dict]:
+    """Audio yuklab olish (MP3)"""
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
         "outtmpl": str(TEMP_DIR / f"{fname}.%(ext)s"),
     }
+    
+    # FFmpeg bilan MP3 ga konvertatsiya
     if _FFMPEG:
         opts["ffmpeg_location"] = str(Path(_FFMPEG).parent)
-        opts["format"]          = "bestaudio[abr<=128]/bestaudio/best"  # 160 -> 128 (tezroq, kichikroq)
-        opts["postprocessors"]  = [{"key": "FFmpegExtractAudio",
-                                    "preferredcodec": "mp3", "preferredquality": "128"}]  # 160 -> 128
+        opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "128"
+        }]
     else:
-        opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
+        # FFmpeg yo'q bo'lsa, to'g'ridan-to'g'ri audio
+        opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+    
     try:
-        log.info(f"[YUKLAB OLISH BOSHLANDI] {url[:50]}")
+        log.info(f"[YUKLAB OLISH BOSHLANDI] {url[:60]}")
+        
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
+        
         if not info:
             log.error("[YUKLAB OLISH] info=None")
-            return None
+            return {"error": "failed"}
+        
         log.info(f"[YUKLAB OLISH TUGADI] {info.get('title', '')[:50]}")
+        
+    except yt_dlp.utils.DownloadError as ex:
+        log.error(f"[DOWNLOAD ERROR] {str(ex)}", exc_info=True)
+        return {"error": "failed"}
     except Exception as ex:
-        log.error(f"[MP3 XATO] {ex}", exc_info=True)
+        log.error(f"[MP3 XATO] {str(ex)}", exc_info=True)
         return {"error": "failed"}
 
     for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
