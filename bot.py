@@ -1154,19 +1154,24 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
     await cb.answer(f"⬇️ {track['title'][:40]}")
     
     name = cb.from_user.first_name if cb.from_user else "Foydalanuvchi"
-    log.info(f"📥 {name} - \"{track['title'][:30]}...\"")
+    log.info(f"📥 {name} (ID:{uid}) - \"{track['title'][:30]}...\" URL: {track['url'][:50]}")
     
     # Yangi xabar yuborish (eski xabarni o'chirmaslik)
     start_time = time.time()
-    progress_msg = await bot.send_message(
-        cb.message.chat.id,
-        f"📥 <b>Yuklanmoqda...</b>\n\n"
-        f"🎵 <b>{h(track['title'])}</b>\n"
-        f"👤 {h(track.get('uploader', ''))}\n"
-        f"⏱ {track.get('duration', '?')}\n\n"
-        f"⏳ Jarayon: <code>0%</code>",
-        parse_mode=PM,
-    )
+    try:
+        progress_msg = await bot.send_message(
+            cb.message.chat.id,
+            f"📥 <b>Yuklanmoqda...</b>\n\n"
+            f"🎵 <b>{h(track['title'])}</b>\n"
+            f"👤 {h(track.get('uploader', ''))}\n"
+            f"⏱ {track.get('duration', '?')}\n\n"
+            f"⏳ Jarayon: <code>0%</code>",
+            parse_mode=PM,
+        )
+    except Exception as e:
+        log.error(f"[XABAR YUBORISHDA XATO] {e}")
+        await cb.answer("❌ Xato yuz berdi", show_alert=True)
+        return
     
     # Progress update task (Optimizatsiya: umumiy funksiya)
     download_complete = [False]
@@ -1174,14 +1179,26 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
         update_progress_bar(progress_msg, track, start_time, download_complete, "🎵")
     )
     
-    result = await download_audio(track["url"])
+    try:
+        log.info(f"[DOWNLOAD START] URL: {track['url']}")
+        result = await download_audio(track["url"])
+        log.info(f"[DOWNLOAD RESULT] {result}")
+    except Exception as e:
+        log.error(f"[DOWNLOAD EXCEPTION] {e}", exc_info=True)
+        result = {"error": "exception", "message": str(e)}
+    
     download_complete[0] = True
     progress_task.cancel()
     
     if not result:
         log.error(f"[YUKLAB OLISH] result=None, url={track['url']}")
+        await progress_msg.edit_text("❌ Yuklab olishda xato yuz berdi. Qaytadan urinib ko'ring.")
+        return
     elif result.get("error"):
         log.error(f"[YUKLAB OLISH] error={result.get('error')}, url={track['url']}")
+        error_msg = result.get("message", "Noma'lum xato")
+        await progress_msg.edit_text(f"❌ Xato: {error_msg}\n\nQaytadan urinib ko'ring.")
+        return
     
     elapsed = time.time() - start_time
     
