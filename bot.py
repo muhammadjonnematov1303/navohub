@@ -700,17 +700,6 @@ def _download_audio_sync(url: str) -> Optional[dict]:
         "size_mb": round(size_mb, 1),
         "thumbnail": f"https://i.ytimg.com/vi/{info.get('id','')}/hqdefault.jpg",
     }
-                return {"error": "too_large", "size": round(size, 1)}
-            return {
-                "file_path": str(fp),
-                "title":     info.get("title") or 'Nomalum',
-                "uploader":  info.get("uploader") or info.get("channel") or "",
-                "duration":  fmt_dur(info.get("duration")),
-                "dur_secs":  info.get("duration") or 0,
-                "size_mb":   round(size, 1),
-                "thumbnail": f"https://i.ytimg.com/vi/{info.get('id','')}/hqdefault.jpg",
-            }
-    return None
 
 def _download_video_sync(url: str, quality: int) -> Optional[dict]:
     fname = f"navo_{int(time.time()*1000)}"
