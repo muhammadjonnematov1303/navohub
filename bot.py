@@ -798,13 +798,13 @@ def kb_tracks(count: int, page: int = 0) -> InlineKeyboardMarkup:
     end = min(start + PER_PAGE, count)
     
     for i in range(start + 1, end + 1):
-        b.button(text=str(i), callback_data=f"t:{i-1}", style="primary")
+        b.button(text=str(i), callback_data=f"t:{i-1}")
     b.adjust(5)
     
     if end < count:
-        b.row(InlineKeyboardButton(text="📄 Keyingi →", callback_data=f"page:{page+1}", style="primary"))
+        b.row(InlineKeyboardButton(text="📄 Keyingi →", callback_data=f"page:{page+1}"))
     
-    b.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel", style="danger"))
+    b.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel"))
     return b.as_markup()
 
 def kb_video_formats(available_heights: list[int]) -> InlineKeyboardMarkup:
@@ -817,23 +817,23 @@ def kb_video_formats(available_heights: list[int]) -> InlineKeyboardMarkup:
     
     for label, h in quality_buttons:
         if not available_heights or any(ah >= h for ah in available_heights):
-            b.button(text=f"🎬 {label}", callback_data=f"vf:{h}", style="primary")
+            b.button(text=f"🎬 {label}", callback_data=f"vf:{h}")
     
-    b.button(text="🎬 Original video", callback_data="vf:0", style="primary")
+    b.button(text="🎬 Original video", callback_data="vf:0")
     b.adjust(4)
     b.row(
-        InlineKeyboardButton(text="🎵 MP3 Audio", callback_data="vf:mp3", style="success"),
-        InlineKeyboardButton(text="🖼 Preview rasm", callback_data="vf:pic", style="primary"),
+        InlineKeyboardButton(text="🎵 MP3 Audio", callback_data="vf:mp3"),
+        InlineKeyboardButton(text="🖼 Preview rasm", callback_data="vf:pic"),
     )
-    b.row(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel", style="danger"))
+    b.row(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel"))
     return b.as_markup()
 
 def kb_back(page: int = 0) -> InlineKeyboardMarkup:
     keyboard = [[]]
     if page > 0:
-        keyboard[0].append(InlineKeyboardButton(text="← Oldingi", callback_data=f"page:{page-1}", style="primary"))
-    keyboard[0].append(InlineKeyboardButton(text="🔍 Yangi qidiruv", callback_data="new_search", style="primary"))
-    keyboard[0].append(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel", style="danger"))
+        keyboard[0].append(InlineKeyboardButton(text="← Oldingi", callback_data=f"page:{page-1}"))
+    keyboard[0].append(InlineKeyboardButton(text="🔍 Yangi qidiruv", callback_data="new_search"))
+    keyboard[0].append(InlineKeyboardButton(text="❌ Bekor", callback_data="cancel"))
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # ═══════════════════════════════════════════════════════
@@ -1142,6 +1142,8 @@ async def on_page(cb: CallbackQuery) -> None:
 # ───────────────────────────────────────────────────────
 @router.callback_query(F.data.startswith("t:"))
 async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
+    log.info(f"[CALLBACK] User {cb.from_user.id} selected track: {cb.data}")
+    
     uid  = cb.from_user.id
     idx  = int(cb.data.split(":")[1])
     sess = user_sessions.get(uid)
