@@ -415,11 +415,12 @@ def _install_ffmpeg() -> Optional[str]:
                 pass
         return None
 
-_FFMPEG = _find_ffmpeg() or _install_ffmpeg()
+_FFMPEG = _find_ffmpeg()
 if _FFMPEG:
-    log.info(f"[FFMPEG]  {_FFMPEG}")
+    log.info(f"[FFMPEG]  ✅ Topildi: {_FFMPEG}")
 else:
-    log.warning("[FFMPEG]  Topilmadi - faqat audio formatlar yuklanadi")
+    log.warning("[FFMPEG]  ⚠️  Topilmadi - birinchi video yuklanishida o'rnatiladi")
+    log.warning("[FFMPEG]  💡 Yoki qo'lda o'rnating: winget install ffmpeg")
 
 # ═══════════════════════════════════════════════════════
 # 8. YOUTUBE INNERTUBE QIDIRUV (ultra tez ~0.3s)
@@ -722,6 +723,16 @@ def _download_audio_sync(url: str) -> Optional[dict]:
     }
 
 def _download_video_sync(url: str, quality: int) -> Optional[dict]:
+    """Video yuklab olish (FFmpeg lazy loading bilan)"""
+    global _FFMPEG
+    
+    # FFmpeg yo'q bo'lsa, hozir o'rnatish
+    if not _FFMPEG:
+        log.info("[FFMPEG]  Video uchun kerak - o'rnatilmoqda...")
+        _FFMPEG = _install_ffmpeg()
+        if not _FFMPEG:
+            return {"error": "ffmpeg_required", "message": "FFmpeg o'rnatilmadi"}
+    
     fname = f"navo_{int(time.time()*1000)}"
     opts  = {
         **_ydl_base_opts(),
