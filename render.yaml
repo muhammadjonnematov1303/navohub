@@ -3,9 +3,7 @@ services:
     name: navohub-bot
     env: python
     runtime: python
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install --upgrade pip && pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
