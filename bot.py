@@ -130,7 +130,7 @@ logging.getLogger("yt_dlp").setLevel(logging.WARNING)  # CRITICAL -> WARNING (xa
 
 # Darhol test xabari
 print("\n" + "=" * 50, flush=True)
-print("  🎵 NavoHub Bot", flush=True)
+print("  🎵 NavoHub Bot v2.2", flush=True)
 print("=" * 50, flush=True)
 log.info("🚀 Bot yuklanmoqda...")
 
