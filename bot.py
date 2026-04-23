@@ -3,6 +3,7 @@
 ╔══════════════════════════════════════════════════════╗
 ║            NavoHub — Telegram Musiqa Bot             ║
 ║        YouTube qidiruv | MP3 | Video formatlar       ║
+║                    v2.1 - Optimized                  ║
 ╚══════════════════════════════════════════════════════╝
 """
 
