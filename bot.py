@@ -522,17 +522,19 @@ def _ydl_base_opts() -> dict:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 10,  # 15 -> 10 (tezroq)
-        "retries":        3,   # 5 -> 3 (tezroq)
-        "fragment_retries": 3, # 5 -> 3 (tezroq)
+        "socket_timeout": 10,
+        "retries":        3,
+        "fragment_retries": 3,
         "no_check_certificate": True,
         "geo_bypass": True,
         "extractor_args": {
-            "youtube": {"player_client": ["android", "web"]},  # android birinchi (tezroq)
-            "default": {"nocheckcertificate": True}
+            "youtube": {
+                "player_client": ["android"],  # Faqat android (bot detection bypass)
+                "skip": ["hls", "dash"],
+            },
         },
-        "http_chunk_size": 10_485_760,  # 2MB -> 10MB (tezroq yuklab olish)
-        "concurrent_fragment_downloads": 16,  # 8 -> 16 (parallel yuklab olish)
+        "http_chunk_size": 10_485_760,
+        "concurrent_fragment_downloads": 16,
     }
     if COOKIES_FILE.exists() and COOKIES_FILE.stat().st_size > 100:
         opts["cookiefile"] = str(COOKIES_FILE)
