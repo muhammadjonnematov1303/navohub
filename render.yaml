@@ -2,10 +2,11 @@ services:
   - type: web
     name: navohub-bot
     env: python
-    buildCommand: pip install -r requirements.txt
+    runtime: python
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
         sync: false
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
