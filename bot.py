@@ -301,7 +301,7 @@ async def update_progress_bar(
         progress = min(95, progress + 20)  # 15 -> 20 (tezroq o'sish)
         elapsed = time.time() - start_time
         try:
-            title = info.get('title', "Noma'lum")
+            title = info.get('title', 'Noma\'lum')
             uploader = info.get('uploader', '')
             duration = info.get('duration', '?')
             caption_text = (
@@ -336,11 +336,14 @@ async def show_completion(
         media_type: "🎵" yoki "🎬"
     """
     try:
+        title = info.get('title', 'Noma\'lum')
+        uploader = info.get('uploader', '')
+        duration = info.get('duration', '?')
         caption_text = (
             f"✅ <b>Tayyor!</b>\n\n"
-            f"{media_type} <b>{h(info.get('title', "Noma'lum"))}</b>\n"
-            f"👤 {h(info.get('uploader', ''))}\n"
-            f"⏱ {info.get('duration', '?')}\n\n"
+            f"{media_type} <b>{h(title)}</b>\n"
+            f"👤 {h(uploader)}\n"
+            f"⏱ {duration}\n\n"
             f"⏳ Jarayon: <code>100%</code>\n"
             f"⏱ Vaqt: <code>{int(elapsed)}s</code>"
         )
@@ -1122,7 +1125,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 cb.message.chat.id,
                 photo=thumb_url,
                 caption=f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>0%</code>\n"
@@ -1134,7 +1137,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             progress_msg = await bot.send_message(
                 cb.message.chat.id,
                 f"📥 <b>Yuklanmoqda...</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>0%</code>\n"
@@ -1145,7 +1148,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         progress_msg = await bot.send_message(
             cb.message.chat.id,
             f"📥 <b>Yuklanmoqda...</b>\n\n"
-            f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+            f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
             f"👤 {h(info.get('uploader', ''))}\n"
             f"⏱ {info.get('duration', '?')}\n\n"
             f"⏳ Jarayon: <code>0%</code>\n"
@@ -1167,7 +1170,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     if progress_msg.photo:
                         await progress_msg.edit_caption(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1177,7 +1180,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                     else:
                         await progress_msg.edit_text(
                             f"📥 <b>Yuklanmoqda...</b>\n\n"
-                            f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                            f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                             f"👤 {h(info.get('uploader', ''))}\n"
                             f"⏱ {info.get('duration', '?')}\n\n"
                             f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1200,7 +1203,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             if progress_msg.photo:
                 await progress_msg.edit_caption(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1210,7 +1213,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
             else:
                 await progress_msg.edit_text(
                     f"✅ <b>Tayyor!</b>\n\n"
-                    f"🎵 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                    f"🎵 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                     f"👤 {h(info.get('uploader', ''))}\n"
                     f"⏱ {info.get('duration', '?')}\n\n"
                     f"⏳ Jarayon: <code>100%</code>\n"
@@ -1250,7 +1253,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 if progress_msg.photo:
                     await progress_msg.edit_caption(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1260,7 +1263,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
                 else:
                     await progress_msg.edit_text(
                         f"📥 <b>Yuklanmoqda...</b>\n\n"
-                        f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                        f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                         f"👤 {h(info.get('uploader', ''))}\n"
                         f"⏱ {info.get('duration', '?')}\n\n"
                         f"⏳ Jarayon: <code>{progress}%</code>\n"
@@ -1283,7 +1286,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         if progress_msg.photo:
             await progress_msg.edit_caption(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
@@ -1294,7 +1297,7 @@ async def on_video_format(cb: CallbackQuery, bot: Bot) -> None:
         else:
             await progress_msg.edit_text(
                 f"✅ <b>Yuklab olindi!</b>\n\n"
-                f"🎬 <b>{h(info.get('title', "Noma'lum"))}</b>\n"
+                f"🎬 <b>{h(info.get('title', 'Noma\'lum'))}</b>\n"
                 f"👤 {h(info.get('uploader', ''))}\n"
                 f"⏱ {info.get('duration', '?')}\n\n"
                 f"⏳ Jarayon: <code>100%</code>\n"
