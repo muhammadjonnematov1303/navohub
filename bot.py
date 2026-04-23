@@ -522,15 +522,14 @@ def _ydl_base_opts() -> dict:
         "no_warnings":    True,
         "ignoreerrors":   False,
         "noplaylist":     True,
-        "socket_timeout": 15,
+        "socket_timeout": 20,
         "retries":        5,
         "fragment_retries": 5,
         "no_check_certificate": True,
         "geo_bypass": True,
         "extractor_args": {
             "youtube": {
-                "player_client": ["ios", "android"],  # iOS eng ishonchli
-                "skip": ["hls", "dash"],
+                "player_client": ["mweb", "android"],  # mweb eng ishonchli
             },
         },
         "http_chunk_size": 10_485_760,
