@@ -611,12 +611,15 @@ def _download_audio_sync(url: str) -> Optional[dict]:
     else:
         opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
     try:
+        log.info(f"[YUKLAB OLISH BOSHLANDI] {url[:50]}")
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         if not info:
+            log.error("[YUKLAB OLISH] info=None")
             return None
+        log.info(f"[YUKLAB OLISH TUGADI] {info.get('title', '')[:50]}")
     except Exception as ex:
-        log.error("[MP3 XATO]  %s", ex)
+        log.error(f"[MP3 XATO] {ex}", exc_info=True)
         return {"error": "failed"}
 
     for ext in ("mp3", "m4a", "webm", "opus", "ogg"):
@@ -1082,6 +1085,11 @@ async def on_track_select(cb: CallbackQuery, bot: Bot) -> None:
     result = await download_audio(track["url"])
     download_complete[0] = True
     progress_task.cancel()
+    
+    if not result:
+        log.error(f"[YUKLAB OLISH] result=None, url={track['url']}")
+    elif result.get("error"):
+        log.error(f"[YUKLAB OLISH] error={result.get('error')}, url={track['url']}")
     
     elapsed = time.time() - start_time
     
