@@ -366,8 +366,10 @@ _FFMPEG_URL = (
 )
 
 def _find_ffmpeg() -> Optional[str]:
+    # Avval system FFmpeg ni tekshirish
     if p := shutil.which("ffmpeg"):
         return p
+    # Windows uchun local FFmpeg
     return str(_FFMPEG_BIN) if _FFMPEG_BIN.exists() else None
 
 def _install_ffmpeg() -> Optional[str]:
@@ -393,6 +395,10 @@ def _install_ffmpeg() -> Optional[str]:
         return None
 
 _FFMPEG = _find_ffmpeg() or _install_ffmpeg()
+if _FFMPEG:
+    log.info(f"[FFMPEG]  {_FFMPEG}")
+else:
+    log.warning("[FFMPEG]  Topilmadi - faqat audio formatlar yuklanadi")
 
 # ═══════════════════════════════════════════════════════
 # 8. YOUTUBE INNERTUBE QIDIRUV (ultra tez ~0.3s)
@@ -942,7 +948,17 @@ async def _handle_search(msg: Message, query: str) -> None:
     )
     
     start_time = time.time()
-    tracks = await search_tracks(query)
+    try:
+        tracks = await search_tracks(query)
+    except Exception as ex:
+        log.error(f"[QIDIRUV XATO] {ex}", exc_info=True)
+        await status.edit_text(
+            f"❌ <b>Yuklab olishda xatolik yuz berdi.</b>\n\n"
+            f"🔄 Qayta urinib ko'ring.",
+            parse_mode=PM,
+        )
+        return
+    
     elapsed = time.time() - start_time
     
     if not tracks:
